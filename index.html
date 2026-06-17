@@ -954,6 +954,9 @@ function togglePassVis(){ const inp=document.getElementById('net-pass-input'); i
 document.addEventListener('DOMContentLoaded', ()=>{
   const passInp=document.getElementById('net-pass-input');
   if(passInp) passInp.addEventListener('input',()=>{ document.getElementById('net-pass-warn').style.display=passInp.value.trim()===''?'block':'none'; });
+  // Android Chrome bonus: silently reconnect to a previously-paired device
+  // without showing the picker. No-op on iOS / unsupported browsers.
+  tryAutoConnect();
 });
 
 async function applyNetwork(){
@@ -1054,82 +1057,13 @@ window.handleBleConnect = async function() {
 
   try {
     // Browser device picker — filtered to our service UUID
-    bleDevice = await navigator.bluetooth.requestDevice({
+    const device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [BLE_SVC] }]
     });
-
-    bleDevice.addEventListener('gattserverdisconnected', onBleDisconnect);
-
-    setBleBtn('connecting');
-    setStatus('', 'Connecting to ' + (bleDevice.name || 'Tank-U') + '…');
-
-    bleServer = await bleDevice.gatt.connect();
-    const svc = await bleServer.getPrimaryService(BLE_SVC);
-
-    // DataView (returned by readValue / characteristicvaluechanged) is ArrayBufferView
-    // — TextDecoder accepts it directly
-    const dec = v => new TextDecoder().decode(v);
-
-    const lvlChar  = await svc.getCharacteristic(BLE_LVL);
-    const galChar  = await svc.getCharacteristic(BLE_GAL);
-    const batChar  = await svc.getCharacteristic(BLE_BAT);
-    const sessChar = await svc.getCharacteristic(BLE_SESS);
-    // Get CMD write characteristic (Step 3)
-    let cmdChar = null;
-    try { cmdChar = await svc.getCharacteristic(BLE_CMD); } catch(_) {}
-    bleChars = { lvl: lvlChar, gal: galChar, bat: batChar, sess: sessChar, cmd: cmdChar };
-
-    await lvlChar.startNotifications();
-    lvlChar.addEventListener('characteristicvaluechanged', e => {
-      const pct = parseInt(dec(e.target.value));
-      if (!isNaN(pct)) { app.blePct = pct; tryRenderBle(); }
-    });
-
-    await galChar.startNotifications();
-    galChar.addEventListener('characteristicvaluechanged', e => {
-      const gal = parseFloat(dec(e.target.value));
-      if (!isNaN(gal)) { app.bleGallons = gal; tryRenderBle(); }
-    });
-
-    await batChar.startNotifications();
-    batChar.addEventListener('characteristicvaluechanged', e => {
-      const bat = parseInt(dec(e.target.value));
-      if (!isNaN(bat)) updateBattery(bat, false);
-    });
-
-    await sessChar.startNotifications();
-    sessChar.addEventListener('characteristicvaluechanged', e => {
-      handleBleSession(dec(e.target.value) === '1');
-    });
-
-    // Read initial values so display populates before first notification fires (~500 ms)
-    try {
-      const [lvlV, galV, batV] = await Promise.all([
-        lvlChar.readValue(),
-        galChar.readValue(),
-        batChar.readValue()
-      ]);
-      const pct = parseInt(dec(lvlV));
-      const gal = parseFloat(dec(galV));
-      const bat = parseInt(dec(batV));
-      if (!isNaN(pct)) app.blePct     = pct;
-      if (!isNaN(gal)) app.bleGallons = gal;
-      if (!isNaN(bat)) updateBattery(bat, false);
-      tryRenderBle();
-    } catch(_) { /* notifications will arrive shortly */ }
-
-    bleConnected = true;
-    stopDemo();
-    const devName = bleDevice.name || 'Tank-U';
-    setBleBtn('connected', devName);
-    setStatus('live', 'BLE live — ' + devName);
-    setWifiBadge(ws && ws.readyState === 1);
-
+    await _bleConnect(device);
   } catch(e) {
     console.warn('[BLE]', e);
-    bleDevice = null;
-    bleServer = null;
-    bleChars  = {};
+    bleDevice = null; bleServer = null; bleChars = {};
     setBleBtn('idle');
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('user cancelled') || msg.includes('chooser') || msg.includes('user denied')) {
@@ -1139,6 +1073,100 @@ window.handleBleConnect = async function() {
     }
   }
 };
+
+// ─────────────────────────────────────────────────────────────
+//  Shared GATT connect sequence — used by manual connect + auto-reconnect
+// ─────────────────────────────────────────────────────────────
+async function _bleConnect(device) {
+  bleDevice = device;
+  bleDevice.addEventListener('gattserverdisconnected', onBleDisconnect);
+
+  setBleBtn('connecting');
+  setStatus('', 'Connecting to ' + (bleDevice.name || 'Tank-U') + '…');
+
+  bleServer = await bleDevice.gatt.connect();
+  const svc = await bleServer.getPrimaryService(BLE_SVC);
+
+  // DataView (returned by readValue / characteristicvaluechanged) is ArrayBufferView
+  // — TextDecoder accepts it directly
+  const dec = v => new TextDecoder().decode(v);
+
+  const lvlChar  = await svc.getCharacteristic(BLE_LVL);
+  const galChar  = await svc.getCharacteristic(BLE_GAL);
+  const batChar  = await svc.getCharacteristic(BLE_BAT);
+  const sessChar = await svc.getCharacteristic(BLE_SESS);
+  let cmdChar = null;
+  try { cmdChar = await svc.getCharacteristic(BLE_CMD); } catch(_) {}
+  bleChars = { lvl: lvlChar, gal: galChar, bat: batChar, sess: sessChar, cmd: cmdChar };
+
+  await lvlChar.startNotifications();
+  lvlChar.addEventListener('characteristicvaluechanged', e => {
+    const pct = parseInt(dec(e.target.value));
+    if (!isNaN(pct)) { app.blePct = pct; tryRenderBle(); }
+  });
+
+  await galChar.startNotifications();
+  galChar.addEventListener('characteristicvaluechanged', e => {
+    const gal = parseFloat(dec(e.target.value));
+    if (!isNaN(gal)) { app.bleGallons = gal; tryRenderBle(); }
+  });
+
+  await batChar.startNotifications();
+  batChar.addEventListener('characteristicvaluechanged', e => {
+    const bat = parseInt(dec(e.target.value));
+    if (!isNaN(bat)) updateBattery(bat, false);
+  });
+
+  await sessChar.startNotifications();
+  sessChar.addEventListener('characteristicvaluechanged', e => {
+    handleBleSession(dec(e.target.value) === '1');
+  });
+
+  // Read initial values so display populates before first notification fires (~500 ms)
+  try {
+    const [lvlV, galV, batV] = await Promise.all([
+      lvlChar.readValue(), galChar.readValue(), batChar.readValue()
+    ]);
+    const pct = parseInt(dec(lvlV));
+    const gal = parseFloat(dec(galV));
+    const bat = parseInt(dec(batV));
+    if (!isNaN(pct)) app.blePct     = pct;
+    if (!isNaN(gal)) app.bleGallons = gal;
+    if (!isNaN(bat)) updateBattery(bat, false);
+    tryRenderBle();
+  } catch(_) { /* notifications will arrive shortly */ }
+
+  bleConnected = true;
+  stopDemo();
+  const devName = bleDevice.name || 'Tank-U';
+  setBleBtn('connected', devName);
+  setStatus('live', 'BLE live — ' + devName);
+  setWifiBadge(ws && ws.readyState === 1);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Auto-reconnect on page load (Android Chrome bonus)
+//  Uses getDevices() — no picker, no user gesture needed.
+//  Silently fails on unsupported browsers; user can always tap manually.
+// ─────────────────────────────────────────────────────────────
+async function tryAutoConnect() {
+  if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
+  let devices;
+  try { devices = await navigator.bluetooth.getDevices(); } catch(_) { return; }
+  if (!devices.length) return;
+  // Use the first previously-granted device
+  const device = devices[0];
+  console.log('[BLE] Auto-reconnecting to', device.name || device.id);
+  try {
+    await _bleConnect(device);
+  } catch(e) {
+    // Device not in range or unavailable — silently reset to idle
+    console.warn('[BLE] Auto-connect failed:', e.message);
+    bleDevice = null; bleServer = null; bleChars = {};
+    setBleBtn('idle');
+    setStatus('', '');
+  }
+}
 
 // ─────────────────────────────────────────────────────────────
 //  WiFi WebSocket — config sync when on DieselTank AP
@@ -1309,6 +1337,12 @@ connectWS();
 setTimeout(() => {
   if (!bleConnected && (!ws || ws.readyState !== 1)) startDemo();
 }, 3000);
+
+// Disconnect BLE cleanly when the page unloads so the ESP32
+// doesn't sit in "still connected" limbo until the supervision timeout.
+window.addEventListener('pagehide', () => {
+  if (bleDevice) bleDevice.gatt.disconnect();
+});
 
 // Service worker for offline / PWA install
 if ('serviceWorker' in navigator) {
