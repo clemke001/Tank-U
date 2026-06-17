@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tank-U</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tank-U">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --surface2:  #1c2230;
+  --border:    #30363d;
+  --text:      #e6edf3;
+  --muted:     #8b949e;
+  --accent:    #f0a500;
+  --danger:    #f85149;
+  --ok:        #3fb950;
+  --warn:      #d29922;
+  --info:      #58a6ff;
+  --gauge-bg:  #21262d;
+  --gauge-max: 320px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 56px;
+}
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 50;
+}
+.header-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px; gap: 6px;
+}
+header h1 {
+  font-size: .9rem; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--accent); white-space: nowrap;
+}
+.hdr-left  { display: flex; align-items: center; gap: 7px; }
+.hdr-right { display: flex; align-items: center; gap: 8px; }
+.mode-badge {
+  font-size: .62rem; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  letter-spacing: .06em;
+  background: var(--gauge-bg); color: var(--muted);
+  border: 1px solid var(--border);
+}
+.mode-badge.m1 { color: var(--info);   border-color: var(--info); }
+.mode-badge.m2 { color: var(--accent); border-color: var(--accent); }
+.ble-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); border-radius: 6px; padding: 3px 9px;
+  font-size: .68rem; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  transition: background .15s, color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.ble-btn:hover { background: var(--gauge-bg); color: var(--text); }
+.ble-btn.ble-connecting { color: var(--info); border-color: var(--info); }
+.ble-btn.ble-connecting .ble-spinner { animation: ble-spin .7s linear infinite; display: inline-block; }
+.ble-btn.ble-connected  { color: var(--ok);   border-color: var(--ok); }
+.ble-spinner { display: none; }
+@keyframes ble-spin { to { transform: rotate(360deg); } }
+.wifi-badge {
+  font-size: .62rem; padding: 2px 7px; border-radius: 4px;
+  background: rgba(88,166,255,.12); color: var(--info);
+  border: 1px solid rgba(88,166,255,.3); white-space: nowrap;
+  display: none;
+}
+.wifi-badge.show { display: inline-block; }
+.bat-wrap { display: flex; align-items: center; gap: 4px; }
+.bat-icon { display: flex; align-items: center; gap: 1px; position: relative; }
+.bat-body { width: 20px; height: 10px; border: 1.5px solid var(--muted); border-radius: 2px; overflow: hidden; position: relative; }
+.bat-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ok); transition: width .6s ease, background .4s; }
+.bat-nub { width: 3px; height: 5px; background: var(--muted); border-radius: 0 1px 1px 0; }
+.bat-charging { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 7px; color: #fff; pointer-events: none; display: none; }
+.bat-charging.on { display: flex; }
+#bat-pct { font-size: .68rem; color: var(--muted); min-width: 28px; }
+.status-chip { display: flex; align-items: center; gap: 5px; }
+#status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); transition: background .4s; flex-shrink: 0; }
+#status-dot.live { background: var(--ok); }
+#status-dot.demo { background: var(--warn); }
+#status-label { font-size: .68rem; color: var(--muted); }
+#timer-bar-wrap { display: none; padding: 0 13px 7px; }
+#timer-bar-wrap.visible { display: block; }
+.timer-track { height: 3px; background: var(--gauge-bg); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
+#timer-fill { height: 100%; background: var(--info); border-radius: 2px; transition: width .9s linear, background .4s; width: 100%; }
+#timer-fill.urgent   { background: var(--warn); }
+#timer-fill.critical { background: var(--danger); }
+#timer-label { font-size: .62rem; color: var(--muted); text-align: right; }
+main { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 13px; padding: 14px 13px 18px; }
+.gauge-wrap { position: relative; width: min(var(--gauge-max), 92vw); transition: width .45s cubic-bezier(.4,0,.2,1); }
+.gauge-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+#arc-bg   { fill: none; stroke: var(--gauge-bg); stroke-linecap: round; stroke-width: 13; }
+#arc-fill { fill: none; stroke-linecap: round; stroke-width: 13; transition: stroke-dashoffset .8s cubic-bezier(.4,0,.2,1), stroke .4s; }
+#gauge-center { position: absolute; bottom: 13%; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; }
+#gauge-center .big   { font-size: 2.3rem; font-weight: 700; line-height: 1; }
+#gauge-center .label { font-size: .65rem; color: var(--muted); letter-spacing: .09em; text-transform: uppercase; margin-top: 2px; }
+#offset-badge { display: none; position: absolute; top: 8px; right: 8px; font-size: .62rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; color: var(--muted); }
+#offset-badge.on { display: block; }
+#session-banner { display: none; width: 100%; max-width: 480px; background: var(--surface2); border: 1px solid var(--info); border-radius: 10px; padding: 9px 13px; }
+#session-banner.active { display: block; }
+.session-header { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.session-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--info); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+.session-title { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--info); font-weight: 700; }
+.session-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+.s-cell .s-val  { font-size: 1.1rem; font-weight: 700; }
+.s-cell .s-unit { font-size: .65rem; color: var(--muted); }
+.s-cell .s-lbl  { font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 1px; }
+#readouts-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; width: 100%; max-width: 480px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.card.wide { grid-column: 1 / -1; }
+.c-label { font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 3px; }
+.c-val   { font-size: 1.3rem; font-weight: 600; }
+.c-unit  { font-size: .7rem; color: var(--muted); }
+#stats-card { display: none; width: 100%; max-width: 480px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+#stats-card.visible { display: block; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
+.stat-item .sv { font-size: 1.05rem; font-weight: 600; }
+.stat-item .sl { font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+#status-bar { font-size: .68rem; color: var(--muted); text-align: center; width: 100%; max-width: 480px; }
+.panel { width: 100%; max-width: 480px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px; cursor: pointer; user-select: none; }
+.ph-title { font-size: .8rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.ph-count { font-size: .65rem; background: var(--gauge-bg); color: var(--muted); padding: 1px 6px; border-radius: 10px; }
+.ph-arrow { color: var(--muted); font-size: .72rem; transition: transform .2s; }
+.panel.open .ph-arrow { transform: rotate(180deg); }
+.panel-body { display: none; }
+.panel.open .panel-body { display: block; }
+.history-list { padding: 0 13px 11px; display: flex; flex-direction: column; gap: 6px; }
+.hist-item { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.hi-date { font-size: .68rem; color: var(--muted); }
+.hi-gal  { font-size: .95rem; font-weight: 700; text-align: right; }
+.hi-meta { font-size: .65rem; color: var(--muted); }
+.hi-cost { font-size: .68rem; color: var(--accent); text-align: right; }
+.hist-empty { padding: 13px; text-align: center; font-size: .78rem; color: var(--muted); }
+.hist-actions { display: flex; gap: 8px; margin: 0 13px 11px; }
+.clear-btn, .export-btn { flex: 1; background: transparent; border-radius: 6px; padding: 6px; font-size: .75rem; cursor: pointer; transition: background .15s; }
+.clear-btn  { border: 1px solid var(--danger); color: var(--danger); }
+.export-btn { border: 1px solid var(--accent); color: var(--accent); }
+.clear-btn:hover  { background: rgba(248,81,73,.1); }
+.export-btn:hover { background: rgba(88,166,255,.1); }
+.settings-body { padding: 0 13px 13px; display: flex; flex-direction: column; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.field-desc { font-size: .65rem; color: var(--muted); margin-top: 1px; }
+select, input[type="number"] { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 7px 9px; font-size: .86rem; width: 100%; -webkit-appearance: none; appearance: none; }
+select:focus, input:focus { outline: 1px solid var(--accent); }
+.mode-toggle { display: flex; }
+.mode-btn { flex: 1; padding: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--muted); transition: background .15s, color .15s; }
+.mode-btn:first-child { border-radius: 6px 0 0 6px; }
+.mode-btn:last-child  { border-radius: 0 6px 6px 0; border-left: none; }
+.mode-btn.active-m1   { background: rgba(88,166,255,.15); color: var(--info); border-color: var(--info); }
+.mode-btn.active-m2   { background: rgba(240,165,0,.15);  color: var(--accent); border-color: var(--accent); }
+.slider-row { display: flex; align-items: center; gap: 9px; }
+.slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+.slider-val { font-size: .8rem; font-weight: 600; min-width: 52px; text-align: right; }
+.offset-row { display: flex; align-items: center; gap: 9px; }
+.offset-row input[type="range"] { flex: 1; accent-color: var(--warn); }
+#offset-display { font-size: .8rem; font-weight: 600; min-width: 64px; text-align: right; color: var(--warn); }
+#offset-display.zero { color: var(--muted); }
+.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.sw-toggle { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+.sw-toggle input { opacity: 0; width: 0; height: 0; }
+.sw-track { position: absolute; inset: 0; background: var(--muted); border-radius: 22px; transition: background .2s; cursor: pointer; }
+.sw-track:before { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform .2s; }
+.sw-toggle input:checked + .sw-track { background: var(--accent); }
+.sw-toggle input:checked + .sw-track:before { transform: translateX(16px); }
+.ref-table { width: 100%; border-collapse: collapse; font-size: .7rem; color: var(--muted); }
+.ref-table th { text-align: left; padding: 3px 5px; border-bottom: 1px solid var(--border); color: var(--text); font-weight: 600; }
+.ref-table td { padding: 3px 5px; }
+.ref-table tr.active td { color: var(--accent); font-weight: 700; }
+.vis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.vis-item { display: flex; align-items: center; justify-content: space-between; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; }
+.vis-label { font-size: .75rem; color: var(--text); }
+.switch { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .sw-track { position: absolute; inset: 0; background: #374151; border-radius: 18px; cursor: pointer; transition: background .2s; }
+.switch .sw-track::before { content: ''; position: absolute; width: 12px; height: 12px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+.switch input:checked + .sw-track { background: var(--ok); }
+.switch input:checked + .sw-track::before { transform: translateX(16px); }
+.input-prefix { display: flex; align-items: center; }
+.prefix-sym { background: var(--gauge-bg); border: 1px solid var(--border); border-right: none; color: var(--muted); padding: 7px 8px; font-size: .86rem; border-radius: 6px 0 0 6px; }
+.input-prefix input { border-radius: 0 6px 6px 0; }
+.btn { background: var(--accent); color: #000; border: none; border-radius: 6px; padding: 9px; font-size: .86rem; font-weight: 700; cursor: pointer; width: 100%; transition: opacity .15s; }
+.btn:hover { opacity: .85; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 7px; font-size: .75rem; font-weight: 600; cursor: pointer; width: 100%; transition: background .15s; }
+.btn-ghost:hover { background: var(--gauge-bg); }
+.btn-warn  { background: var(--warn);   color: #000; }
+.btn-danger{ background: var(--danger); color: #fff; }
+.sub-section { border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.sub-section-danger { border-color: rgba(248,81,73,.4); }
+.sub-section-hdr { display: flex; align-items: center; justify-content: space-between; }
+.sub-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.net-ssid-row { display: flex; align-items: center; gap: 8px; }
+.net-label { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.net-ssid-val { flex: 1; font-size: .92rem; font-weight: 600; color: var(--text); }
+.net-gear { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 7px; font-size: .85rem; cursor: pointer; transition: background .15s, color .15s; }
+.net-gear:hover { background: var(--gauge-bg); color: var(--text); }
+.pass-row { display: flex; gap: 6px; }
+.pass-row input { flex: 1; }
+.pass-eye { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 0 8px; font-size: .85rem; cursor: pointer; }
+.warn-open { color: var(--warn) !important; }
+.check-row { display: flex; align-items: center; gap: 8px; font-size: .8rem; cursor: pointer; }
+.check-row input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+.wifi-required { font-size: .68rem; color: var(--info); background: rgba(88,166,255,.08); border: 1px solid rgba(88,166,255,.25); border-radius: 6px; padding: 7px 10px; display: none; }
+.wifi-required.show { display: block; }
+@keyframes flash { 0%,100%{opacity:1} 50%{opacity:.3} }
+.flashing { animation: flash 1.1s ease-in-out infinite; }
+#dev-toggle { position: fixed; bottom: 13px; right: 13px; z-index: 100; background: #1f2937; border: 1px solid #374151; color: #6b7280; border-radius: 7px; padding: 6px 11px; font-size: .7rem; font-weight: 600; cursor: pointer; letter-spacing: .05em; box-shadow: 0 4px 12px rgba(0,0,0,.5); transition: border-color .2s, color .2s; }
+#dev-toggle.active { border-color: var(--accent); color: var(--accent); }
+#dev-panel { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 99; background: #111827; border-top: 2px solid var(--accent); padding: 13px 13px 56px; box-shadow: 0 -8px 32px rgba(0,0,0,.6); max-height: 72vh; overflow-y: auto; }
+#dev-panel.open { display: block; }
+.dev-title { font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: 12px; }
+.dev-row { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.dev-label { font-size: .68rem; color: var(--muted); white-space: nowrap; min-width: 90px; }
+#mock-ohm-slider { flex: 1; accent-color: var(--accent); cursor: pointer; }
+#mock-ohm-display { font-size: .78rem; font-weight: 600; min-width: 60px; text-align: right; }
+.preset-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+.preset-btn { background: #1f2937; border: 1px solid #374151; color: var(--text); border-radius: 5px; padding: 5px 11px; font-size: .73rem; font-weight: 600; cursor: pointer; transition: background .12s; }
+.preset-btn:hover { background: #374151; }
+.sw-row { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+#sweep-btn { background: #1f2937; border: 1px solid #374151; color: var(--muted); border-radius: 5px; padding: 5px 11px; font-size: .73rem; font-weight: 600; cursor: pointer; transition: border-color .15s, color .15s; }
+#sweep-btn.sweeping { border-color: var(--accent); color: var(--accent); }
+@media (orientation:landscape) and (max-height:520px) {
+  main { flex-direction: row; flex-wrap: wrap; justify-content: center; padding: 8px; gap: 8px; }
+  .gauge-wrap { width: min(var(--gauge-max), 42vw) !important; }
+  #readouts-wrap, .panel, #stats-card, #session-banner, #status-bar { width: 260px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-row">
+    <div class="hdr-left">
+      <h1>&#9981; Tank&#8209;U</h1>
+      <span class="mode-badge" id="mode-badge">M1</span>
+    </div>
+    <div class="hdr-right">
+      <button id="ble-btn" onclick="handleBleConnect()" class="ble-btn" title="Connect via Bluetooth">
+        <span class="ble-spinner">&#8635;</span>
+        <span id="ble-btn-txt">&#128241; Scan</span>
+      </button>
+      <span class="wifi-badge" id="wifi-badge">&#9881; Config</span>
+      <div class="bat-wrap" id="bat-wrap" style="display:none">
+        <div class="bat-icon">
+          <div class="bat-body">
+            <div class="bat-fill" id="bat-fill" style="width:100%"></div>
+            <div class="bat-charging" id="bat-charging">&#9889;</div>
+          </div>
+          <div class="bat-nub"></div>
+        </div>
+        <span id="bat-pct">&#8212;</span>
+      </div>
+      <div class="status-chip">
+        <span id="status-label">No device</span>
+        <div id="status-dot"></div>
+      </div>
+    </div>
+  </div>
+  <div id="timer-bar-wrap">
+    <div class="timer-track"><div id="timer-fill"></div></div>
+    <div id="timer-label">&#8212;</div>
+  </div>
+</header>
+<main>
+  <div class="gauge-wrap" id="gauge-wrap">
+    <svg viewBox="0 0 220 120" xmlns="http://www.w3.org/2000/svg">
+      <text x="14"  y="90" font-size="11" fill="#8b949e" font-family="sans-serif" font-weight="bold">E</text>
+      <text x="200" y="90" font-size="11" fill="#8b949e" font-family="sans-serif" font-weight="bold">F</text>
+      <g id="ticks"></g>
+      <path id="arc-bg"/>
+      <path id="arc-fill"/>
+    </svg>
+    <div id="gauge-center">
+      <div class="big" id="pct-text" style="color:var(--muted)">&#8212;</div>
+      <div class="label">Tank Level</div>
+    </div>
+    <div id="offset-badge">&#177;0 gal</div>
+  </div>
+  <div id="session-banner">
+    <div class="session-header">
+      <div class="session-dot"></div>
+      <span class="session-title">Dispensing</span>
+    </div>
+    <div class="session-grid">
+      <div class="s-cell"><div class="s-lbl">Dispensed</div>
+        <div><span class="s-val" id="sess-gal">0.0</span> <span class="s-unit">gal</span></div></div>
+      <div class="s-cell"><div class="s-lbl">Cost</div>
+        <div><span class="s-unit">$</span><span class="s-val" id="sess-cost">0.00</span></div></div>
+      <div class="s-cell"><div class="s-lbl">Duration</div>
+        <div><span class="s-val" id="sess-dur">0:00</span></div></div>
+    </div>
+  </div>
+  <div id="readouts-wrap">
+    <div class="card"><div class="c-label">In Tank</div>
+      <div><span class="c-val" id="vol-text">&#8212;</span> <span class="c-unit">gal</span></div></div>
+    <div class="card"><div class="c-label">Empty Space</div>
+      <div><span class="c-val" id="rem-text">&#8212;</span> <span class="c-unit">gal</span></div></div>
+    <div class="card wide"><div class="c-label">Sender Resistance</div>
+      <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
+        <span class="c-val" id="ohm-val">&#8212;</span><span class="c-unit">&#937;</span>
+        <span style="font-size:.68rem;color:var(--muted)" id="ohm-range"></span>
+      </div></div>
+  </div>
+  <div class="card wide" id="stats-card" style="max-width:480px;width:100%">
+    <div class="c-label">Usage Stats</div>
+    <div class="stats-grid">
+      <div class="stat-item"><div class="sv" id="stat-rate">&#8212;</div><div class="sl">Avg gal/day</div></div>
+      <div class="stat-item"><div class="sv" id="stat-days">&#8212;</div><div class="sl">Days remaining</div></div>
+      <div class="stat-item"><div class="sv" id="stat-total">&#8212;</div><div class="sl">Total dispensed</div></div>
+      <div class="stat-item"><div class="sv" id="stat-sessions">&#8212;</div><div class="sl">Sessions logged</div></div>
+    </div>
+  </div>
+  <div id="status-bar">Tap Scan to find your Tank&#8209;U device.</div>
+  <div class="panel" id="history-panel">
+    <div class="panel-header" onclick="togglePanel('history-panel')">
+      <span class="ph-title">&#128203; Fill History <span class="ph-count" id="hist-count">0</span></span>
+      <span class="ph-arrow">&#9662;</span>
+    </div>
+    <div class="panel-body">
+      <div class="history-list" id="history-list">
+        <div class="hist-empty">No sessions logged yet.</div>
+      </div>
+      <div class="hist-actions">
+        <button class="export-btn" onclick="exportHistory()">&#11015; Export CSV</button>
+        <button class="clear-btn"  onclick="clearHistory()">&#10005; Clear</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="settings-panel">
+    <div class="panel-header" onclick="togglePanel('settings-panel')">
+      <span class="ph-title">&#9881; Settings</span>
+      <span class="ph-arrow">&#9662;</span>
+    </div>
+    <div class="panel-body">
+      <div class="settings-body">
+        <div class="wifi-required" id="wifi-required-notice">
+          &#9432; Connect to the DieselTank WiFi network to save settings to the device.
+        </div>
+        <div class="field">
+          <label>Power Mode</label>
+          <div class="mode-toggle">
+            <button class="mode-btn active-m1" id="btn-m1" onclick="setMode(1)">Mode 1 &#8212; Wake / Sleep</button>
+            <button class="mode-btn"           id="btn-m2" onclick="setMode(2)">Mode 2 &#8212; Constant</button>
+          </div>
+        </div>
+        <div class="field" id="timer-field">
+          <label>Wake Timer (minutes)</label>
+          <div class="slider-row">
+            <input type="range" id="timer-slider" min="1" max="30" step="1" value="5"
+              oninput="document.getElementById('timer-val').textContent=this.value+' min'">
+            <span class="slider-val" id="timer-val">5 min</span>
+          </div>
+          <button class="btn-ghost" onclick="setDefaultTimer()">Set as Default</button>
+        </div>
+        <div class="field">
+          <label>Tank Capacity (US gallons)</label>
+          <input type="number" id="cap-input" min="1" max="9999" step="1" value="100">
+        </div>
+        <div class="field">
+          <label>Sender Calibration Offset</label>
+          <div class="offset-row">
+            <input type="range" id="offset-slider" min="-50" max="50" step="0.5" value="0"
+              oninput="updateOffsetDisplay(this.value)">
+            <span id="offset-display" class="zero">No offset</span>
+          </div>
+          <div class="field-desc">Adjust if your sender reads slightly high or low. Applied after standard conversion.</div>
+        </div>
+        <div class="field">
+          <label>Switch-Based Sessions</label>
+          <div class="toggle-row">
+            <label class="sw-toggle">
+              <input type="checkbox" id="sw-session-chk" checked onchange="onSwSessionChange()">
+              <span class="sw-track"></span>
+            </label>
+            <span id="sw-session-lbl">Enabled</span>
+          </div>
+          <div class="field-desc">Hold ON for trigger delay to start session; switch OFF to close it.</div>
+        </div>
+        <div class="field" id="disp-trig-field">
+          <label>Dispense Trigger Delay (seconds)</label>
+          <div class="slider-row">
+            <input type="range" id="disp-trig-slider" min="10" max="60" step="5" value="30"
+              oninput="document.getElementById('disp-trig-val').textContent=this.value+' s'">
+            <span class="slider-val" id="disp-trig-val">30 s</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Price per Gallon</label>
+          <div class="input-prefix">
+            <span class="prefix-sym">$</span>
+            <input type="number" id="price-input" min="0" max="99" step="0.01" value="3.85">
+          </div>
+        </div>
+        <div class="field">
+          <label>Sender Standard</label>
+          <select id="std-select" onchange="onStdChange()">
+            <option value="SAE"  selected>American SAE &#8212; 240 &#937; (E) &middot; 33 &#937; (F)</option>
+            <option value="VDO">European VDO &#8212; 10 &#937; (E) &middot; 180 &#937; (F)</option>
+            <option value="JIS">Japanese JIS &#8212; 3 &#937; (E) &middot; 110 &#937; (F)</option>
+            <option value="GM">GM / Delco &#8212; 0 &#937; (E) &middot; 90 &#937; (F)</option>
+            <option value="FORD">Ford / Motorcraft &#8212; 73 &#937; (E) &middot; 8 &#937; (F)</option>
+            <option value="CUSTOM">Custom&#8230;</option>
+          </select>
+        </div>
+        <div id="custom-fields" style="display:none;flex-direction:column;gap:9px">
+          <div class="field"><label>Empty (&#937;)</label>
+            <input type="number" id="cust-empty" min="0" max="9999" step="0.1" value="240"></div>
+          <div class="field"><label>Full (&#937;)</label>
+            <input type="number" id="cust-full" min="0" max="9999" step="0.1" value="33"></div>
+        </div>
+        <details id="ref-details" style="border:1px solid var(--border);border-radius:7px;overflow:hidden">
+          <summary style="padding:8px 11px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;justify-content:space-between">
+            Sender Reference <span id="ref-arrow" style="font-size:.65rem;transition:transform .2s">&#9662;</span>
+          </summary>
+          <div style="padding:0 11px 10px">
+          <table class="ref-table" id="ref-table">
+            <thead><tr><th>Standard</th><th>Empty (&#937;)</th><th>Full (&#937;)</th></tr></thead>
+            <tbody>
+              <tr data-std="SAE" ><td>American SAE</td><td>240</td><td>33</td></tr>
+              <tr data-std="VDO" ><td>European VDO</td><td>10</td><td>180</td></tr>
+              <tr data-std="JIS" ><td>Japanese JIS</td><td>3</td><td>110</td></tr>
+              <tr data-std="GM"  ><td>GM / Delco</td><td>0</td><td>90</td></tr>
+              <tr data-std="FORD"><td>Ford / Motorcraft</td><td>73</td><td>8</td></tr>
+            </tbody>
+          </table>
+          </div>
+        </details>
+        <div class="field">
+          <label>Display Panels</label>
+          <div class="vis-grid">
+            <div class="vis-item"><span class="vis-label">Session Info</span>
+              <label class="switch"><input type="checkbox" id="vis-session" checked onchange="setPanelVis('session',this.checked)"><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Readouts</span>
+              <label class="switch"><input type="checkbox" id="vis-readouts" checked onchange="setPanelVis('readouts',this.checked)"><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Usage Stats</span>
+              <label class="switch"><input type="checkbox" id="vis-stats" checked onchange="setPanelVis('stats',this.checked)"><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">History</span>
+              <label class="switch"><input type="checkbox" id="vis-history" checked onchange="setPanelVis('history',this.checked)"><span class="sw-track"></span></label></div>
+          </div>
+        </div>
+        <button class="btn" onclick="applySettings()">Apply Settings</button>
+        <div class="sub-section">
+          <div class="sub-section-hdr"><span class="sub-title">&#128246; Network</span></div>
+          <div class="net-ssid-row">
+            <span class="net-label">SSID</span>
+            <span class="net-ssid-val" id="net-ssid-display">DieselTank</span>
+            <button class="net-gear" onclick="toggleNetEdit()" title="Change network settings">&#9881;</button>
+          </div>
+          <div id="net-edit" style="display:none">
+            <div class="field" style="margin-top:8px">
+              <label>Network Name (SSID)</label>
+              <input type="text" id="net-ssid-input" maxlength="31" placeholder="DieselTank" value="DieselTank">
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <div class="pass-row">
+                <input type="password" id="net-pass-input" maxlength="63" placeholder="Leave blank for open network">
+                <button class="pass-eye" onclick="togglePassVis()" title="Show/hide password">&#128065;</button>
+              </div>
+              <div class="field-desc warn-open" id="net-pass-warn" style="display:none">
+                &#9888; Open network &#8212; anyone nearby can connect. A password is recommended.
+              </div>
+            </div>
+            <div class="field-desc" style="margin-bottom:6px">Requires WiFi connection to the device. Device will restart after applying.</div>
+            <button class="btn btn-warn" onclick="applyNetwork()">Apply &amp; Restart</button>
+          </div>
+        </div>
+        <div class="sub-section">
+          <div class="sub-section-hdr"><span class="sub-title">&#128282; Bluetooth PIN</span></div>
+          <div class="net-ssid-row">
+            <span class="net-label">PIN</span>
+            <span class="net-ssid-val" id="ble-pin-display">Off</span>
+            <button class="net-gear" onclick="toggleBleEdit()" title="Change BLE PIN">&#9881;</button>
+          </div>
+          <div id="ble-edit" style="display:none">
+            <div class="field" style="margin-top:8px">
+              <label>Pairing PIN (6 digits)</label>
+              <input type="text" id="ble-pin-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="Leave blank to disable PIN" style="letter-spacing:.12em;font-size:1.1rem">
+              <div class="field-desc" style="margin-top:4px">When set, phones must enter this PIN to pair via Bluetooth. Leave blank for open pairing.</div>
+            </div>
+            <div class="field-desc" style="margin-bottom:6px">Requires WiFi connection. Device will restart after applying.</div>
+            <button class="btn btn-warn" onclick="applyBlePin()">Apply &amp; Restart</button>
+          </div>
+        </div>
+        <div class="sub-section sub-section-danger">
+          <div class="sub-section-hdr"><span class="sub-title">&#9888; Factory Reset</span></div>
+          <div class="field-desc" style="margin-bottom:8px">Resets all settings to defaults. Network returns to <strong>DieselTank</strong> with no password.</div>
+          <label class="check-row">
+            <input type="checkbox" id="keep-history-chk" checked>
+            <span>Keep fill history</span>
+          </label>
+          <button class="btn btn-danger" onclick="confirmFactoryReset()">Restore Factory Defaults</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<button id="dev-toggle" onclick="toggleDev()">&#129514; DEV</button>
+<div id="dev-panel">
+  <div class="dev-title">&#129514; Mock / Test Controls</div>
+  <div class="sw-row">
+    <label class="switch"><input type="checkbox" id="mock-live" onchange="mockLiveToggle(this.checked)"><span class="sw-track"></span></label>
+    <span style="font-size:.7rem;color:var(--muted)">Simulate Live connection</span>
+  </div>
+  <div class="sw-row">
+    <label class="switch"><input type="checkbox" id="mock-session" onchange="mockSessionToggle(this.checked)"><span class="sw-track"></span></label>
+    <span style="font-size:.7rem;color:var(--muted)">Simulate active dispense session</span>
+  </div>
+  <div class="dev-row">
+    <span class="dev-label">Sender (&#937;)</span>
+    <input type="range" id="mock-ohm-slider" oninput="mockSlider(this.value)">
+    <span id="mock-ohm-display">&#8212;</span>
+  </div>
+  <div class="dev-row">
+    <span class="dev-label">Battery %</span>
+    <input type="range" id="mock-bat-slider" min="0" max="100" step="1" value="85"
+      oninput="updateBattery(parseInt(this.value), false)">
+    <span id="mock-bat-display" style="font-size:.78rem;font-weight:600;min-width:36px;text-align:right">85%</span>
+  </div>
+  <div class="dev-label" style="margin-bottom:5px">Quick presets</div>
+  <div class="preset-row">
+    <button class="preset-btn" onclick="mockPreset(0)">Empty</button>
+    <button class="preset-btn" onclick="mockPreset(0.25)">&#188;</button>
+    <button class="preset-btn" onclick="mockPreset(0.5)">&#189;</button>
+    <button class="preset-btn" onclick="mockPreset(0.75)">&#190;</button>
+    <button class="preset-btn" onclick="mockPreset(1)">Full</button>
+  </div>
+  <div class="dev-row">
+    <span class="dev-label">Auto sweep</span>
+    <button id="sweep-btn" onclick="toggleSweep()">&#9654; Start</button>
+    <span style="font-size:.65rem;color:var(--muted);flex:1;margin-left:5px">Cycles E &#8594; F &#8594; E</span>
+  </div>
+  <div class="dev-row">
+    <span class="dev-label">Add session</span>
+    <button class="preset-btn" onclick="mockAddHistory()">+ Log Entry</button>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  BLE UUIDs  (must match sketch_ble/sketch.ino defines)
+// ─────────────────────────────────────────────────────────────
+const BLE_SVC  = 'aa55aa55-0000-0000-0000-000000000001';
+const BLE_LVL  = 'aa55aa55-0000-0000-0000-000000000002';  // Tank Level %
+const BLE_GAL  = 'aa55aa55-0000-0000-0000-000000000003';  // Gallons Remaining
+const BLE_BAT  = 'aa55aa55-0000-0000-0000-000000000004';  // Battery %
+const BLE_SESS = 'aa55aa55-0000-0000-0000-000000000005';  // Session Active
+const BLE_CMD  = 'aa55aa55-0000-0000-0000-000000000006';  // Command write — Step 3
+
+// ─────────────────────────────────────────────────────────────
+//  Sender standards
+// ─────────────────────────────────────────────────────────────
+const STANDARDS = {
+  SAE:    { emptyOhm:240, fullOhm:33,  label:'SAE'    },
+  VDO:    { emptyOhm:10,  fullOhm:180, label:'VDO'    },
+  JIS:    { emptyOhm:3,   fullOhm:110, label:'JIS'    },
+  GM:     { emptyOhm:0,   fullOhm:90,  label:'GM'     },
+  FORD:   { emptyOhm:73,  fullOhm:8,   label:'Ford'   },
+  CUSTOM: { emptyOhm:240, fullOhm:33,  label:'Custom' },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  App state
+// ─────────────────────────────────────────────────────────────
+let app = {
+  mode: 1, stdKey: 'SAE', capacityG: 100, pricePerGal: 3.85,
+  timerMin: 5, defaultTimer: 5, calOffset: 0,
+  switchSession: true, dispenseTriggerSec: 30,
+  ohms: null,
+  bleGallons: null,
+  blePct: null,
+  batPct: null, charging: false,
+  sessionActive: false, sessionGal: 0, sessionStartMs: null,
+  history: [],
+  panels: { session: true, readouts: true, stats: true, history: true },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  BLE state  (Web Bluetooth)
+// ─────────────────────────────────────────────────────────────
+let bleDevice          = null;   // BluetoothDevice
+let bleServer          = null;   // BluetoothRemoteGATTServer
+let bleChars           = {};     // populated on connect; cmd added in Step 3
+let bleConnected       = false;
+let bleSessionStartGal = null;
+
+// ─────────────────────────────────────────────────────────────
+//  Gauge constants
+// ─────────────────────────────────────────────────────────────
+const CX=110,CY=115,R=90,E_ANG=200,F_ANG=340;
+const SWEEP_DEG=F_ANG-E_ANG;
+const ARC_LEN=(SWEEP_DEG/360)*2*Math.PI*R;
+const CIRCUMFERENCE=2*Math.PI*R;
+
+function svgPt(cx,cy,r,deg){const rad=deg*Math.PI/180;return[cx+r*Math.cos(rad),cy+r*Math.sin(rad)];}
+
+function initGauge(){
+  const[ex,ey]=svgPt(CX,CY,R,E_ANG),[fx,fy]=svgPt(CX,CY,R,F_ANG);
+  const d='M '+ex.toFixed(2)+' '+ey.toFixed(2)+' A '+R+' '+R+' 0 0 1 '+fx.toFixed(2)+' '+fy.toFixed(2);
+  document.getElementById('arc-bg').setAttribute('d',d);
+  const fill=document.getElementById('arc-fill');
+  fill.setAttribute('d',d);
+  fill.style.strokeDasharray=ARC_LEN.toFixed(2)+' '+CIRCUMFERENCE.toFixed(2);
+  fill.style.strokeDashoffset=ARC_LEN.toFixed(2);
+  fill._arcLen=ARC_LEN;
+  const tickG=document.getElementById('ticks');
+  [0,.25,.5,.75,1].forEach((f,i)=>{
+    const ang=E_ANG+f*SWEEP_DEG;
+    const[ix,iy]=svgPt(CX,CY,R+8,ang),[ox,oy]=svgPt(CX,CY,R+17,ang);
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',ix.toFixed(1));line.setAttribute('y1',iy.toFixed(1));
+    line.setAttribute('x2',ox.toFixed(1));line.setAttribute('y2',oy.toFixed(1));
+    line.setAttribute('stroke',i%2===0?'#8b949e':'#3d444d');
+    line.setAttribute('stroke-width',i%2===0?'1.5':'1');
+    tickG.appendChild(line);
+    if(f===.25||f===.5||f===.75){
+      const[lx,ly]=svgPt(CX,CY,R+27,ang);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',lx.toFixed(1));t.setAttribute('y',(ly+3).toFixed(1));
+      t.setAttribute('font-size','8');t.setAttribute('fill','#3d444d');
+      t.setAttribute('text-anchor','middle');t.setAttribute('font-family','sans-serif');
+      t.textContent=f===.25?'¼':f===.5?'½':'¾';
+      tickG.appendChild(t);
+    }
+  });
+}
+
+function updateGaugeSize(){
+  const vis=Object.values(app.panels).filter(Boolean).length;
+  const sizes=[520,440,380,340,300];
+  const max=sizes[Math.min(vis,sizes.length-1)];
+  document.documentElement.style.setProperty('--gauge-max', max+'px');
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Panel visibility
+// ─────────────────────────────────────────────────────────────
+const PANEL_MAP = { session:'session-banner', readouts:'readouts-wrap', stats:'stats-card', history:'history-panel' };
+
+function setPanelVis(key, visible) {
+  app.panels[key] = visible;
+  const el = document.getElementById(PANEL_MAP[key]);
+  if (!visible) { el.style.display = 'none'; }
+  else { el.style.display = ''; if (key==='session' && app.sessionActive) el.classList.add('active'); if (key==='stats') renderStats(); }
+  savePanelPrefs(); updateGaugeSize();
+}
+function savePanelPrefs(){ try { localStorage.setItem('dtm_panels', JSON.stringify(app.panels)); } catch(_){} }
+function loadPanelPrefs(){
+  try {
+    const raw=localStorage.getItem('dtm_panels');
+    if(raw){ const saved=JSON.parse(raw); Object.keys(PANEL_MAP).forEach(k=>{ if(k in saved){ app.panels[k]=saved[k]; document.getElementById('vis-'+k).checked=saved[k]; if(!saved[k]) document.getElementById(PANEL_MAP[k]).style.display='none'; } }); }
+  } catch(_){}
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Render helpers
+// ─────────────────────────────────────────────────────────────
+function ohmsToFraction(ohms,std){ return Math.max(0,Math.min(1,(ohms-std.emptyOhm)/(std.fullOhm-std.emptyOhm))); }
+function applyOffset(rawGal){ return Math.max(0, Math.min(app.capacityG, rawGal + app.calOffset)); }
+function levelColor(f){ if(f<=.15)return'#f85149'; if(f<=.30)return'#d29922'; return'#3fb950'; }
+
+function getCurrentGallons() {
+  if (app.bleGallons != null) return app.bleGallons;
+  if (app.ohms != null) {
+    const std = STANDARDS[app.stdKey];
+    return applyOffset(ohmsToFraction(app.ohms, std) * app.capacityG);
+  }
+  return null;
+}
+
+function render(ohms){
+  const std=STANDARDS[app.stdKey];
+  const rawFrac = ohms!=null ? ohmsToFraction(ohms,std) : 0;
+  const rawGal  = rawFrac * app.capacityG;
+  const adjGal  = ohms!=null ? applyOffset(rawGal) : 0;
+  const adjFrac = adjGal / app.capacityG;
+  const pct     = Math.round(adjFrac*100);
+  const rem     = app.capacityG - adjGal;
+  const col     = levelColor(adjFrac);
+  const fill=document.getElementById('arc-fill');
+  fill.style.strokeDashoffset=(ARC_LEN*(1-adjFrac)).toFixed(2);
+  fill.style.stroke=col;
+  const pctEl=document.getElementById('pct-text');
+  pctEl.textContent=ohms!=null?pct+'%':'—';
+  pctEl.style.color=ohms!=null?col:'var(--muted)';
+  pctEl.classList.toggle('flashing',ohms!=null&&adjFrac<=.15);
+  document.getElementById('vol-text').textContent=ohms!=null?adjGal.toFixed(1):'—';
+  document.getElementById('rem-text').textContent=ohms!=null?rem.toFixed(1):'—';
+  document.getElementById('ohm-val').textContent =ohms!=null?ohms.toFixed(1):'—';
+  document.getElementById('ohm-range').textContent='('+std.label+' · '+std.emptyOhm+'Ω empty / '+std.fullOhm+'Ω full)';
+  document.querySelectorAll('#ref-table tr[data-std]').forEach(r=>r.classList.toggle('active',r.dataset.std===app.stdKey));
+  const badge=document.getElementById('offset-badge');
+  if(app.calOffset!==0 && ohms!=null){ badge.classList.add('on'); badge.textContent=(app.calOffset>0?'+':'')+app.calOffset.toFixed(1)+' gal'; }
+  else { badge.classList.remove('on'); }
+  if(app.sessionActive&&ohms!=null){
+    document.getElementById('sess-gal').textContent=app.sessionGal.toFixed(1);
+    document.getElementById('sess-cost').textContent=(app.sessionGal*app.pricePerGal).toFixed(2);
+  }
+}
+
+function renderBle(gallons, pct) {
+  const adjFrac = pct / 100;
+  const rem = Math.max(0, app.capacityG - gallons);
+  const col = levelColor(adjFrac);
+  const fill = document.getElementById('arc-fill');
+  fill.style.strokeDashoffset = (ARC_LEN * (1 - adjFrac)).toFixed(2);
+  fill.style.stroke = col;
+  const pctEl = document.getElementById('pct-text');
+  pctEl.textContent = pct + '%';
+  pctEl.style.color = col;
+  pctEl.classList.toggle('flashing', adjFrac <= 0.15);
+  document.getElementById('vol-text').textContent = gallons.toFixed(1);
+  document.getElementById('rem-text').textContent = rem.toFixed(1);
+  document.getElementById('ohm-val').textContent = '—';
+  document.getElementById('ohm-range').textContent = '(BLE live data)';
+  document.querySelectorAll('#ref-table tr[data-std]').forEach(r => r.classList.toggle('active', r.dataset.std === app.stdKey));
+  document.getElementById('offset-badge').classList.remove('on');
+  if (app.sessionActive) {
+    document.getElementById('sess-gal').textContent = app.sessionGal.toFixed(1);
+    document.getElementById('sess-cost').textContent = (app.sessionGal * app.pricePerGal).toFixed(2);
+  }
+}
+
+function tryRenderBle() {
+  if (app.bleGallons != null && app.blePct != null) {
+    renderBle(app.bleGallons, app.blePct);
+    renderStats();
+  }
+}
+
+function updateBattery(pct, isCharging){
+  if(pct==null){document.getElementById('bat-wrap').style.display='none';return;}
+  document.getElementById('bat-wrap').style.display='flex';
+  const fill=document.getElementById('bat-fill');
+  fill.style.width=pct+'%';
+  fill.style.background=pct<=15?'#f85149':pct<=30?'#d29922':'#3fb950';
+  document.getElementById('bat-pct').textContent=pct+'%';
+  document.getElementById('bat-charging').classList.toggle('on',!!isCharging);
+  document.getElementById('mock-bat-display').textContent=pct+'%';
+  document.getElementById('mock-bat-slider').value=pct;
+}
+
+function renderTimer(secRemaining,secTotal){
+  if(app.mode!==1||secRemaining==null){ document.getElementById('timer-bar-wrap').classList.remove('visible');return; }
+  document.getElementById('timer-bar-wrap').classList.add('visible');
+  const frac=Math.max(0,secRemaining/secTotal);
+  const tf=document.getElementById('timer-fill');
+  tf.style.width=(frac*100).toFixed(1)+'%';
+  tf.className=frac>.5?'':frac>.2?'urgent':'critical';
+  const m=Math.floor(secRemaining/60),s=Math.floor(secRemaining%60);
+  document.getElementById('timer-label').textContent='Sleeping in '+m+':'+String(s).padStart(2,'0');
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Session
+// ─────────────────────────────────────────────────────────────
+let sessionTick = null;
+
+function startSession(){
+  app.sessionActive=true;app.sessionStartMs=Date.now();app.sessionGal=0;
+  if(app.panels.session)document.getElementById('session-banner').classList.add('active');
+  clearInterval(sessionTick);
+  sessionTick=setInterval(()=>{
+    if(!app.sessionActive)return;
+    const e=Math.floor((Date.now()-app.sessionStartMs)/1000);
+    document.getElementById('sess-dur').textContent=Math.floor(e/60)+':'+String(e%60).padStart(2,'0');
+  },1000);
+}
+
+function endSession(dispensedGal){
+  if(!app.sessionActive)return;
+  clearInterval(sessionTick);
+  const dur=Math.floor((Date.now()-app.sessionStartMs)/1000);
+  logSession({ts:Math.floor(Date.now()/1000),gal:dispensedGal,cost:dispensedGal*app.pricePerGal,dur});
+  app.sessionActive=false;
+  document.getElementById('session-banner').classList.remove('active');
+}
+
+function handleBleSession(active) {
+  if (active && !app.sessionActive) {
+    bleSessionStartGal = app.bleGallons;
+    startSession();
+  } else if (!active && app.sessionActive) {
+    const dispensed = (bleSessionStartGal != null && app.bleGallons != null)
+      ? Math.max(0, bleSessionStartGal - app.bleGallons)
+      : app.sessionGal;
+    endSession(dispensed);
+    bleSessionStartGal = null;
+  }
+  if (active && app.sessionActive && bleSessionStartGal != null && app.bleGallons != null) {
+    app.sessionGal = Math.max(0, bleSessionStartGal - app.bleGallons);
+  }
+}
+
+function mockSessionToggle(on){if(on)startSession();else endSession(app.sessionGal||0);}
+
+// ─────────────────────────────────────────────────────────────
+//  History
+// ─────────────────────────────────────────────────────────────
+function logSession(e){ app.history.unshift(e);if(app.history.length>50)app.history.pop(); saveHistory();renderHistory();renderStats(); }
+function saveHistory(){try{localStorage.setItem('dtm_history',JSON.stringify(app.history));}catch(_){}}
+function loadHistory(){try{const r=localStorage.getItem('dtm_history');if(r)app.history=JSON.parse(r);}catch(_){}}
+function clearHistory(){if(!confirm('Clear all session history?'))return;app.history=[];saveHistory();renderHistory();renderStats();}
+function exportHistory(){
+  if(!app.history.length){alert('No history to export.');return;}
+  const rows=[['Date','Time','Gallons','Cost ($)','Duration (min)','Price/Gal ($)','Tank Standard','Capacity (gal)']];
+  app.history.forEach(e=>{
+    const d=e.ts?new Date(e.ts*1000):null;
+    rows.push([d?d.toLocaleDateString():'—',d?d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—',parseFloat(e.gal).toFixed(1),parseFloat(e.cost).toFixed(2),e.dur?Math.round(e.dur/60):'—',app.pricePerGal.toFixed(2),app.stdKey,app.capacityG]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+v+'"').join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='tank_u_history_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();URL.revokeObjectURL(url);
+}
+function fmtDate(ts){const d=new Date(ts*1000);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function fmtDur(s){const m=Math.floor(s/60),sec=s%60;return m>0?(m+'m '+sec+'s'):(sec+'s');}
+function renderHistory(){
+  const list=document.getElementById('history-list');
+  document.getElementById('hist-count').textContent=app.history.length;
+  if(!app.history.length){list.innerHTML='<div class="hist-empty">No sessions logged yet.</div>';return;}
+  list.innerHTML=app.history.map(h=>'<div class="hist-item"><span class="hi-date">'+fmtDate(h.ts)+'</span><span class="hi-gal">'+h.gal.toFixed(1)+' gal</span><span class="hi-meta">'+fmtDur(h.dur)+'</span><span class="hi-cost">$'+h.cost.toFixed(2)+'</span></div>').join('');
+}
+function renderStats(){
+  const card=document.getElementById('stats-card');
+  if(app.history.length<2||!app.panels.stats){card.classList.remove('visible');return;}
+  card.classList.add('visible');
+  const total=app.history.reduce((s,h)=>s+h.gal,0);
+  const newest=app.history[0].ts,oldest=app.history[app.history.length-1].ts;
+  const rate=total/Math.max(1,(newest-oldest)/86400);
+  const vol = getCurrentGallons();
+  document.getElementById('stat-rate').textContent=rate.toFixed(1);
+  document.getElementById('stat-days').textContent=vol!=null&&rate>0?(vol/rate).toFixed(1):'—';
+  document.getElementById('stat-total').textContent=total.toFixed(1)+' gal';
+  document.getElementById('stat-sessions').textContent=app.history.length;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  UI helpers
+// ─────────────────────────────────────────────────────────────
+function setMode(m){
+  app.mode=m;
+  document.getElementById('btn-m1').className='mode-btn'+(m===1?' active-m1':'');
+  document.getElementById('btn-m2').className='mode-btn'+(m===2?' active-m2':'');
+  document.getElementById('timer-field').style.display=m===1?'flex':'none';
+  const badge=document.getElementById('mode-badge');
+  badge.textContent='M'+m;badge.className='mode-badge m'+m;
+  if(m===2)renderTimer(null,null);
+}
+function setDefaultTimer(){
+  const v=parseInt(document.getElementById('timer-slider').value);
+  app.defaultTimer=v;
+  try{localStorage.setItem('dtm_default_timer',v);}catch(_){}
+}
+function updateOffsetDisplay(val){
+  const v=parseFloat(val);
+  const el=document.getElementById('offset-display');
+  if(v===0){el.textContent='No offset';el.className='zero';}
+  else{el.textContent=(v>0?'+':'')+v.toFixed(1)+' gal';el.className='';}
+}
+function onStdChange(){ document.getElementById('custom-fields').style.display=document.getElementById('std-select').value==='CUSTOM'?'flex':'none'; }
+
+// ─────────────────────────────────────────────────────────────
+//  Settings
+// ─────────────────────────────────────────────────────────────
+function sendViaWifi(data) {
+  if (ws && ws.readyState === 1) { ws.send(JSON.stringify(data)); return true; }
+  return false;
+}
+
+function applySettings(){
+  const key=document.getElementById('std-select').value;
+  const cap=Math.max(1,parseFloat(document.getElementById('cap-input').value)||100);
+  const price=Math.max(0,parseFloat(document.getElementById('price-input').value)||0);
+  const timer=parseInt(document.getElementById('timer-slider').value)||5;
+  const offset=parseFloat(document.getElementById('offset-slider').value)||0;
+  if(key==='CUSTOM'){
+    const e=parseFloat(document.getElementById('cust-empty').value);
+    const f=parseFloat(document.getElementById('cust-full').value);
+    if(isNaN(e)||isNaN(f)||Math.abs(e-f)<1){alert('Enter distinct Empty/Full values.');return;}
+    STANDARDS.CUSTOM={emptyOhm:e,fullOhm:f,label:'Custom'};
+  }
+  const swSess=document.getElementById('sw-session-chk').checked;
+  const dispTrig=parseInt(document.getElementById('disp-trig-slider').value)||30;
+  app.stdKey=key;app.capacityG=cap;app.pricePerGal=price;
+  app.timerMin=timer;app.calOffset=offset;
+  app.switchSession=swSess;app.dispenseTriggerSec=dispTrig;
+  setMode(app.mode);demoReset();
+  if (bleConnected) tryRenderBle(); else render(app.ohms);
+  renderStats();
+  document.getElementById('settings-panel').classList.remove('open');
+  try{localStorage.setItem('dtm_cal_offset',offset);}catch(_){}
+  const sent = sendViaWifi({type:'config',std_key:key,capacity_gal:cap,price_per_gal:price,
+    timer_min:timer,mode:app.mode,cal_offset:offset,switch_session:swSess,dispense_trigger_sec:dispTrig});
+  if (!sent) setStatus('', bleConnected ? 'BLE live — settings saved locally (connect WiFi to save to device).' : 'Settings saved locally.');
+}
+
+function toggleNetEdit(){ const el=document.getElementById('net-edit'); el.style.display=el.style.display==='none'?'':'none'; }
+function toggleBleEdit(){ const el=document.getElementById('ble-edit'); el.style.display=el.style.display==='none'?'':'none'; }
+
+function applyBlePin(){
+  const pin=document.getElementById('ble-pin-input').value.trim();
+  if(pin&&(pin.length!==6||!/^\d{6}$/.test(pin))){alert('PIN must be exactly 6 digits (e.g. 123456).');return;}
+  const msg=pin===''?'Disable BLE PIN? Anyone nearby can connect via Bluetooth without a password. Proceed?':'Set BLE PIN to '+pin+'? Phones will be prompted for this code when pairing. Device will restart.';
+  if(!confirm(msg))return;
+  if(!sendViaWifi({type:'set_ble_pin',pin})){
+    alert('WiFi not connected. Connect to the DieselTank WiFi network, then try again.');
+    return;
+  }
+  document.getElementById('ble-pin-display').textContent=pin||'Off';
+  document.getElementById('ble-edit').style.display='none';
+  alert('Device is restarting. Wait a moment, then reconnect BLE.');
+}
+
+function togglePassVis(){ const inp=document.getElementById('net-pass-input'); inp.type=inp.type==='password'?'text':'password'; }
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const passInp=document.getElementById('net-pass-input');
+  if(passInp) passInp.addEventListener('input',()=>{ document.getElementById('net-pass-warn').style.display=passInp.value.trim()===''?'block':'none'; });
+});
+
+function applyNetwork(){
+  const ssid=document.getElementById('net-ssid-input').value.trim();
+  const pass=document.getElementById('net-pass-input').value;
+  if(!ssid){alert('SSID cannot be empty.');return;}
+  const msg=pass.trim()===''?('Connect to open network "'+ssid+'" (no password). Proceed?'):('Restart and connect to "'+ssid+'"? You will need to reconnect.');
+  if(!confirm(msg))return;
+  if(!sendViaWifi({type:'set_network',ssid,pass})){
+    alert('WiFi not connected. Connect to the DieselTank WiFi network, then try again.');
+    return;
+  }
+  document.getElementById('net-ssid-display').textContent=ssid;
+  document.getElementById('net-edit').style.display='none';
+  alert('Device is restarting. Reconnect to "'+ssid+'"'+(pass?'':' (no password)')+' then reload.');
+}
+
+function confirmFactoryReset(){
+  const keepHist=document.getElementById('keep-history-chk').checked;
+  const msg=keepHist?'Reset all settings to factory defaults? Fill history will be kept.\n\nThe device will restart.':'Reset ALL settings and erase fill history? This cannot be undone.\n\nThe device will restart.';
+  if(!confirm(msg))return;
+  if(!sendViaWifi({type:'factory_reset',keep_history:keepHist})){
+    alert('WiFi not connected. Connect to the DieselTank WiFi network, then try again.');
+    return;
+  }
+  alert('Factory reset sent. Reconnect to "DieselTank" (no password) then reload.');
+}
+
+function onSwSessionChange(){
+  const on=document.getElementById('sw-session-chk').checked;
+  document.getElementById('sw-session-lbl').textContent=on?'Enabled':'Disabled';
+  document.getElementById('disp-trig-field').style.display=on?'':'none';
+}
+function togglePanel(id){document.getElementById(id).classList.toggle('open');}
+
+// ─────────────────────────────────────────────────────────────
+//  BLE — connect / disconnect  (Web Bluetooth API)
+// ─────────────────────────────────────────────────────────────
+function setBleBtn(state, label) {
+  const btn = document.getElementById('ble-btn');
+  const txt = document.getElementById('ble-btn-txt');
+  const spinner = btn.querySelector('.ble-spinner');
+  btn.className = 'ble-btn';
+  spinner.style.display = 'none';
+  switch(state) {
+    case 'idle':
+      txt.textContent = '📱 Scan';
+      break;
+    case 'scanning':
+    case 'connecting':
+      btn.classList.add('ble-connecting');
+      spinner.style.display = 'inline-block';
+      txt.textContent = state === 'scanning' ? 'Scanning…' : 'Connecting…';
+      break;
+    case 'connected':
+      btn.classList.add('ble-connected');
+      txt.textContent = '● ' + (label || 'BLE');
+      break;
+  }
+}
+
+function onBleDisconnect() {
+  bleConnected       = false;
+  bleDevice          = null;
+  bleServer          = null;
+  bleChars           = {};
+  app.bleGallons     = null;
+  app.blePct         = null;
+  bleSessionStartGal = null;
+  setBleBtn('idle');
+  setStatus('', 'BLE disconnected.');
+  setWifiBadge(ws && ws.readyState === 1);
+  startDemo();
+}
+
+window.handleBleConnect = async function() {
+  // Tap again to disconnect
+  if (bleConnected && bleDevice) {
+    bleDevice.gatt.disconnect();  // fires gattserverdisconnected → onBleDisconnect
+    return;
+  }
+
+  // Web Bluetooth requires HTTPS or localhost; also not supported on iOS Safari (need Bluefy)
+  if (!navigator.bluetooth) {
+    const isIOS = /ipad|iphone|ipod/i.test(navigator.userAgent);
+    if (isIOS) {
+      alert('iOS requires the Bluefy browser for Web Bluetooth.\n\nGet Bluefy free from the App Store, then open this page in Bluefy.');
+    } else {
+      alert('Web Bluetooth is not available.\n\nUse Chrome on Android, or ensure this page is served over HTTPS.');
+    }
+    return;
+  }
+
+  setBleBtn('scanning');
+  setStatus('', 'Scanning for Tank-U devices…');
+
+  try {
+    // Browser device picker — filtered to our service UUID
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [BLE_SVC] }]
+    });
+
+    bleDevice.addEventListener('gattserverdisconnected', onBleDisconnect);
+
+    setBleBtn('connecting');
+    setStatus('', 'Connecting to ' + (bleDevice.name || 'Tank-U') + '…');
+
+    bleServer = await bleDevice.gatt.connect();
+    const svc = await bleServer.getPrimaryService(BLE_SVC);
+
+    // DataView (returned by readValue / characteristicvaluechanged) is ArrayBufferView
+    // — TextDecoder accepts it directly
+    const dec = v => new TextDecoder().decode(v);
+
+    const lvlChar  = await svc.getCharacteristic(BLE_LVL);
+    const galChar  = await svc.getCharacteristic(BLE_GAL);
+    const batChar  = await svc.getCharacteristic(BLE_BAT);
+    const sessChar = await svc.getCharacteristic(BLE_SESS);
+    bleChars = { lvl: lvlChar, gal: galChar, bat: batChar, sess: sessChar };
+    // bleChars.cmd added in Step 3
+
+    await lvlChar.startNotifications();
+    lvlChar.addEventListener('characteristicvaluechanged', e => {
+      const pct = parseInt(dec(e.target.value));
+      if (!isNaN(pct)) { app.blePct = pct; tryRenderBle(); }
+    });
+
+    await galChar.startNotifications();
+    galChar.addEventListener('characteristicvaluechanged', e => {
+      const gal = parseFloat(dec(e.target.value));
+      if (!isNaN(gal)) { app.bleGallons = gal; tryRenderBle(); }
+    });
+
+    await batChar.startNotifications();
+    batChar.addEventListener('characteristicvaluechanged', e => {
+      const bat = parseInt(dec(e.target.value));
+      if (!isNaN(bat)) updateBattery(bat, false);
+    });
+
+    await sessChar.startNotifications();
+    sessChar.addEventListener('characteristicvaluechanged', e => {
+      handleBleSession(dec(e.target.value) === '1');
+    });
+
+    // Read initial values so display populates before first notification fires (~500 ms)
+    try {
+      const [lvlV, galV, batV] = await Promise.all([
+        lvlChar.readValue(),
+        galChar.readValue(),
+        batChar.readValue()
+      ]);
+      const pct = parseInt(dec(lvlV));
+      const gal = parseFloat(dec(galV));
+      const bat = parseInt(dec(batV));
+      if (!isNaN(pct)) app.blePct     = pct;
+      if (!isNaN(gal)) app.bleGallons = gal;
+      if (!isNaN(bat)) updateBattery(bat, false);
+      tryRenderBle();
+    } catch(_) { /* notifications will arrive shortly */ }
+
+    bleConnected = true;
+    stopDemo();
+    const devName = bleDevice.name || 'Tank-U';
+    setBleBtn('connected', devName);
+    setStatus('live', 'BLE live — ' + devName);
+    setWifiBadge(ws && ws.readyState === 1);
+
+  } catch(e) {
+    console.warn('[BLE]', e);
+    bleDevice = null;
+    bleServer = null;
+    bleChars  = {};
+    setBleBtn('idle');
+    const msg = (e.message || '').toLowerCase();
+    if (msg.includes('user cancelled') || msg.includes('chooser') || msg.includes('user denied')) {
+      setStatus('', 'Scan cancelled.');
+    } else {
+      setStatus('', 'BLE error: ' + (e.message || 'connection failed'));
+    }
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+//  WiFi WebSocket — config sync when on DieselTank AP
+// ─────────────────────────────────────────────────────────────
+let ws, pingTimer, wifiRetryTimer;
+
+function setWifiBadge(connected) {
+  const badge = document.getElementById('wifi-badge');
+  badge.classList.toggle('show', !!connected);
+  document.getElementById('wifi-required-notice').classList.toggle('show', !connected);
+}
+
+function connectWS(){
+  clearTimeout(wifiRetryTimer);
+  ws = new WebSocket('ws://192.168.4.1/ws');
+  ws.onopen = () => {
+    setWifiBadge(true);
+    if (!bleConnected) {
+      stopDemo();
+      setStatus('live', 'WiFi live data.');
+    }
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({type:'ping'})), 5000);
+    ws.send(JSON.stringify({type:'timesync', ts: Math.floor(Date.now()/1000)}));
+  };
+  ws.onmessage = ev => {
+    try {
+      const d = JSON.parse(ev.data);
+      if (d.type === 'sensor') {
+        if (!bleConnected) {
+          app.ohms = parseFloat(d.ohms);
+          render(app.ohms);
+          if (d.bat_pct != null) updateBattery(Math.round(d.bat_pct), !!d.charging);
+          if (d.timer_sec != null) renderTimer(d.timer_sec, (app.timerMin||5)*60);
+          if (d.session_active && !app.sessionActive) startSession();
+          if (!d.session_active && app.sessionActive) endSession(d.session_gal || 0);
+          if (app.sessionActive) app.sessionGal = parseFloat(d.session_gal || 0);
+        }
+      } else if (d.type === 'config') {
+        if (d.mode)         setMode(d.mode);
+        if (d.std_key)      { app.stdKey = d.std_key; document.getElementById('std-select').value = d.std_key; }
+        if (d.capacity_gal) { app.capacityG = d.capacity_gal; document.getElementById('cap-input').value = d.capacity_gal; }
+        if (d.price_per_gal){ app.pricePerGal = d.price_per_gal; document.getElementById('price-input').value = d.price_per_gal; }
+        if (d.timer_min)    { app.timerMin = d.timer_min; document.getElementById('timer-slider').value = d.timer_min; document.getElementById('timer-val').textContent = d.timer_min+' min'; }
+        if (d.cal_offset != null) { app.calOffset = d.cal_offset; document.getElementById('offset-slider').value = d.cal_offset; updateOffsetDisplay(d.cal_offset); }
+        if (d.switch_session != null) {
+          app.switchSession = d.switch_session;
+          const chk = document.getElementById('sw-session-chk'); chk.checked = d.switch_session;
+          document.getElementById('sw-session-lbl').textContent = d.switch_session ? 'Enabled' : 'Disabled';
+          document.getElementById('disp-trig-field').style.display = d.switch_session ? '' : 'none';
+        }
+        if (d.dispense_trigger_sec != null) {
+          app.dispenseTriggerSec = d.dispense_trigger_sec;
+          document.getElementById('disp-trig-slider').value = d.dispense_trigger_sec;
+          document.getElementById('disp-trig-val').textContent = d.dispense_trigger_sec+' s';
+        }
+        if (d.ap_ssid)   { document.getElementById('net-ssid-display').textContent = d.ap_ssid; document.getElementById('net-ssid-input').value = d.ap_ssid; }
+        if (d.ble_pin != null) { document.getElementById('ble-pin-display').textContent = d.ble_pin||'Off'; document.getElementById('ble-pin-input').value = d.ble_pin||''; }
+        if (d.timer_sec != null && !bleConnected) renderTimer(d.timer_sec, d.timer_min * 60);
+      } else if (d.type === 'history') {
+        if (Array.isArray(d.sessions)) { app.history = d.sessions; saveHistory(); renderHistory(); renderStats(); }
+      }
+    } catch(_){}
+  };
+  ws.onerror = () => {};
+  ws.onclose = () => {
+    clearInterval(pingTimer);
+    setWifiBadge(false);
+    if (!bleConnected) {
+      setStatus('', 'No connection — tap Scan for BLE.');
+      startDemo();
+    }
+    wifiRetryTimer = setTimeout(connectWS, 5000);
+  };
+}
+
+function setStatus(mode, msg){
+  document.getElementById('status-dot').className = mode;
+  document.getElementById('status-label').textContent = mode==='live' ? 'Live' : mode==='demo' ? 'Demo' : 'Offline';
+  document.getElementById('status-bar').textContent = msg;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Demo mode
+// ─────────────────────────────────────────────────────────────
+let demoTimer, sweepTimer, demoOhms, demoDir;
+
+function demoReset(){ const std=STANDARDS[app.stdKey];demoOhms=std.emptyOhm*.85+std.fullOhm*.15;demoDir=std.fullOhm<std.emptyOhm?-1:1; }
+function demoTick(){
+  if (bleConnected) { stopDemo(); return; }
+  const std=STANDARDS[app.stdKey],range=Math.abs(std.fullOhm-std.emptyOhm);
+  demoOhms+=demoDir*(range/250);
+  const lo=Math.min(std.emptyOhm,std.fullOhm),hi=Math.max(std.emptyOhm,std.fullOhm);
+  if(demoOhms<=lo+range*.01)demoDir=1;if(demoOhms>=hi-range*.01)demoDir=-1;
+  demoOhms=Math.max(lo,Math.min(hi,demoOhms));app.ohms=demoOhms;render(demoOhms);
+}
+function startDemo(){ if(demoTimer||bleConnected)return;demoReset();setStatus('demo','Demo mode — no device connected.');demoTimer=setInterval(demoTick,80); }
+function stopDemo(){ clearInterval(demoTimer);demoTimer=null; }
+
+// ─────────────────────────────────────────────────────────────
+//  Dev panel
+// ─────────────────────────────────────────────────────────────
+function toggleDev(){
+  const p=document.getElementById('dev-panel'),t=document.getElementById('dev-toggle');
+  const open=p.classList.toggle('open');t.classList.toggle('active',open);
+  if(open)syncSlider();
+}
+function syncSlider(){
+  const std=STANDARDS[app.stdKey],lo=Math.min(std.emptyOhm,std.fullOhm),hi=Math.max(std.emptyOhm,std.fullOhm);
+  const sl=document.getElementById('mock-ohm-slider');
+  sl.min=lo;sl.max=hi;sl.step=(hi-lo)/500;
+  const cur=app.ohms!=null?Math.max(lo,Math.min(hi,app.ohms)):(lo+hi)/2;
+  sl.value=cur;
+  document.getElementById('mock-ohm-display').textContent=parseFloat(cur).toFixed(1)+' Ω';
+}
+function mockSlider(v){ app.ohms=parseFloat(v);document.getElementById('mock-ohm-display').textContent=parseFloat(v).toFixed(1)+' Ω';render(app.ohms); }
+function mockPreset(f){ const std=STANDARDS[app.stdKey];const ohms=std.emptyOhm+f*(std.fullOhm-std.emptyOhm);app.ohms=ohms;document.getElementById('mock-ohm-slider').value=ohms;document.getElementById('mock-ohm-display').textContent=ohms.toFixed(1)+' Ω';render(ohms); }
+function mockLiveToggle(on){ if(on){stopDemo();setStatus('live','Mock: simulating live connection.');}else{setStatus('demo','Demo mode.');if(!bleConnected&&(!ws||ws.readyState!==1))startDemo();} }
+function mockAddHistory(){ const e={ts:Math.floor(Date.now()/1000)-Math.floor(Math.random()*86400*7),gal:+(5+Math.random()*20).toFixed(1),cost:0,dur:Math.floor(300+Math.random()*900)};e.cost=+(e.gal*app.pricePerGal).toFixed(2);logSession(e); }
+function toggleSweep(){
+  const btn=document.getElementById('sweep-btn');
+  if(sweepTimer){clearInterval(sweepTimer);sweepTimer=null;btn.textContent='▶ Start';btn.classList.remove('sweeping');}
+  else{
+    stopDemo();
+    const std=STANDARDS[app.stdKey],lo=Math.min(std.emptyOhm,std.fullOhm),hi=Math.max(std.emptyOhm,std.fullOhm);
+    const step=(hi-lo)/300;let cur=app.ohms!=null?Math.max(lo,Math.min(hi,app.ohms)):lo,dir=1;
+    sweepTimer=setInterval(()=>{ cur+=dir*step;if(cur>=hi){cur=hi;dir=-1;}if(cur<=lo){cur=lo;dir=1;}app.ohms=cur;document.getElementById('mock-ohm-slider').value=cur;document.getElementById('mock-ohm-display').textContent=cur.toFixed(1)+' Ω';render(cur); },30);
+    btn.textContent='■ Stop';btn.classList.add('sweeping');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Expose to inline onclick handlers
+// ─────────────────────────────────────────────────────────────
+Object.assign(window, {
+  setPanelVis, togglePanel, setMode, setDefaultTimer,
+  updateOffsetDisplay, onStdChange, applySettings,
+  toggleNetEdit, toggleBleEdit, applyBlePin,
+  togglePassVis, applyNetwork, confirmFactoryReset,
+  onSwSessionChange, clearHistory, exportHistory,
+  toggleDev, mockSlider, mockPreset, mockLiveToggle,
+  mockAddHistory, mockSessionToggle, toggleSweep,
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────────────────────────
+document.getElementById('ref-details').addEventListener('toggle', function(){
+  document.getElementById('ref-arrow').style.transform = this.open ? 'rotate(180deg)' : '';
+});
+
+initGauge();
+loadHistory();
+loadPanelPrefs();
+renderHistory();
+renderStats();
+setMode(1);
+render(null);
+updateGaugeSize();
+setBleBtn('idle');
+setWifiBadge(false);
+
+try { const co=parseFloat(localStorage.getItem('dtm_cal_offset'));if(!isNaN(co)&&co!==0){app.calOffset=co;document.getElementById('offset-slider').value=co;updateOffsetDisplay(co);} }catch(_){}
+try { const dt=parseInt(localStorage.getItem('dtm_default_timer'));if(dt>=1&&dt<=30){app.defaultTimer=dt;app.timerMin=dt;document.getElementById('timer-slider').value=dt;document.getElementById('timer-val').textContent=dt+' min';} }catch(_){}
+
+connectWS();
+
+setTimeout(() => {
+  if (!bleConnected && (!ws || ws.readyState !== 1)) startDemo();
+}, 3000);
+
+// Service worker for offline / PWA install
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(console.warn);
+}
+</script>
+</body>
+</html>
