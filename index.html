@@ -354,7 +354,7 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
     <div class="panel-body">
       <div class="settings-body">
         <div class="wifi-required" id="wifi-required-notice">
-          &#9432; Connect to the DieselTank WiFi network to save settings to the device.
+          &#9432; Connect via BLE or DieselTank WiFi to save settings to the device.
         </div>
         <div class="field">
           <label>Power Mode</label>
@@ -890,7 +890,21 @@ function sendViaWifi(data) {
   return false;
 }
 
-function applySettings(){
+async function sendViaBle(data) {
+  if (!bleConnected || !bleChars.cmd) return false;
+  try {
+    await bleChars.cmd.writeValue(new TextEncoder().encode(JSON.stringify(data)));
+    return true;
+  } catch(e) { console.warn('[BLE CMD]', e); return false; }
+}
+
+// BLE first, WiFi fallback
+async function sendToDevice(data) {
+  if (bleConnected && bleChars.cmd) return await sendViaBle(data);
+  return sendViaWifi(data);
+}
+
+async function applySettings(){
   const key=document.getElementById('std-select').value;
   const cap=Math.max(1,parseFloat(document.getElementById('cap-input').value)||100);
   const price=Math.max(0,parseFloat(document.getElementById('price-input').value)||0);
@@ -912,21 +926,22 @@ function applySettings(){
   renderStats();
   document.getElementById('settings-panel').classList.remove('open');
   try{localStorage.setItem('dtm_cal_offset',offset);}catch(_){}
-  const sent = sendViaWifi({type:'config',std_key:key,capacity_gal:cap,price_per_gal:price,
+  const sent = await sendToDevice({type:'config',std_key:key,capacity_gal:cap,price_per_gal:price,
     timer_min:timer,mode:app.mode,cal_offset:offset,switch_session:swSess,dispense_trigger_sec:dispTrig});
-  if (!sent) setStatus('', bleConnected ? 'BLE live — settings saved locally (connect WiFi to save to device).' : 'Settings saved locally.');
+  if (!sent) setStatus('', 'Settings saved locally — connect to send to device.');
 }
 
 function toggleNetEdit(){ const el=document.getElementById('net-edit'); el.style.display=el.style.display==='none'?'':'none'; }
 function toggleBleEdit(){ const el=document.getElementById('ble-edit'); el.style.display=el.style.display==='none'?'':'none'; }
 
-function applyBlePin(){
+async function applyBlePin(){
   const pin=document.getElementById('ble-pin-input').value.trim();
   if(pin&&(pin.length!==6||!/^\d{6}$/.test(pin))){alert('PIN must be exactly 6 digits (e.g. 123456).');return;}
   const msg=pin===''?'Disable BLE PIN? Anyone nearby can connect via Bluetooth without a password. Proceed?':'Set BLE PIN to '+pin+'? Phones will be prompted for this code when pairing. Device will restart.';
   if(!confirm(msg))return;
-  if(!sendViaWifi({type:'set_ble_pin',pin})){
-    alert('WiFi not connected. Connect to the DieselTank WiFi network, then try again.');
+  const sent = await sendToDevice({type:'set_ble_pin',pin});
+  if(!sent){
+    alert('Not connected. Connect via BLE or DieselTank WiFi, then try again.');
     return;
   }
   document.getElementById('ble-pin-display').textContent=pin||'Off';
@@ -941,14 +956,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(passInp) passInp.addEventListener('input',()=>{ document.getElementById('net-pass-warn').style.display=passInp.value.trim()===''?'block':'none'; });
 });
 
-function applyNetwork(){
+async function applyNetwork(){
   const ssid=document.getElementById('net-ssid-input').value.trim();
   const pass=document.getElementById('net-pass-input').value;
   if(!ssid){alert('SSID cannot be empty.');return;}
   const msg=pass.trim()===''?('Connect to open network "'+ssid+'" (no password). Proceed?'):('Restart and connect to "'+ssid+'"? You will need to reconnect.');
   if(!confirm(msg))return;
-  if(!sendViaWifi({type:'set_network',ssid,pass})){
-    alert('WiFi not connected. Connect to the DieselTank WiFi network, then try again.');
+  const sent = await sendToDevice({type:'set_network',ssid,pass});
+  if(!sent){
+    alert('Not connected. Connect via BLE or DieselTank WiFi, then try again.');
     return;
   }
   document.getElementById('net-ssid-display').textContent=ssid;
@@ -956,12 +972,13 @@ function applyNetwork(){
   alert('Device is restarting. Reconnect to "'+ssid+'"'+(pass?'':' (no password)')+' then reload.');
 }
 
-function confirmFactoryReset(){
+async function confirmFactoryReset(){
   const keepHist=document.getElementById('keep-history-chk').checked;
   const msg=keepHist?'Reset all settings to factory defaults? Fill history will be kept.\n\nThe device will restart.':'Reset ALL settings and erase fill history? This cannot be undone.\n\nThe device will restart.';
   if(!confirm(msg))return;
-  if(!sendViaWifi({type:'factory_reset',keep_history:keepHist})){
-    alert('WiFi not connected. Connect to the DieselTank WiFi network, then try again.');
+  const sent = await sendToDevice({type:'factory_reset',keep_history:keepHist});
+  if(!sent){
+    alert('Not connected. Connect via BLE or DieselTank WiFi, then try again.');
     return;
   }
   alert('Factory reset sent. Reconnect to "DieselTank" (no password) then reload.');
@@ -1057,8 +1074,10 @@ window.handleBleConnect = async function() {
     const galChar  = await svc.getCharacteristic(BLE_GAL);
     const batChar  = await svc.getCharacteristic(BLE_BAT);
     const sessChar = await svc.getCharacteristic(BLE_SESS);
-    bleChars = { lvl: lvlChar, gal: galChar, bat: batChar, sess: sessChar };
-    // bleChars.cmd added in Step 3
+    // Get CMD write characteristic (Step 3)
+    let cmdChar = null;
+    try { cmdChar = await svc.getCharacteristic(BLE_CMD); } catch(_) {}
+    bleChars = { lvl: lvlChar, gal: galChar, bat: batChar, sess: sessChar, cmd: cmdChar };
 
     await lvlChar.startNotifications();
     lvlChar.addEventListener('characteristicvaluechanged', e => {
@@ -1126,10 +1145,10 @@ window.handleBleConnect = async function() {
 // ─────────────────────────────────────────────────────────────
 let ws, pingTimer, wifiRetryTimer;
 
-function setWifiBadge(connected) {
-  const badge = document.getElementById('wifi-badge');
-  badge.classList.toggle('show', !!connected);
-  document.getElementById('wifi-required-notice').classList.toggle('show', !connected);
+function setWifiBadge(wifiConnected) {
+  document.getElementById('wifi-badge').classList.toggle('show', !!wifiConnected);
+  // Notice only needed when neither BLE nor WiFi can reach the device
+  document.getElementById('wifi-required-notice').classList.toggle('show', !wifiConnected && !bleConnected);
 }
 
 function connectWS(){
