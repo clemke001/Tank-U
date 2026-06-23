@@ -189,6 +189,9 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
 .ref-table td { padding: 3px 5px; }
 .ref-table tr.active td { color: var(--accent); font-weight: 700; }
 .vis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.oled-mb { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 5px 10px; font-size: .75rem; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.oled-mb:hover { background: var(--surface); color: var(--text); }
+.oled-mb.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
 .vis-item { display: flex; align-items: center; justify-content: space-between; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; }
 .vis-label { font-size: .75rem; color: var(--text); }
 .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
@@ -445,39 +448,59 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
           </table>
           </div>
         </details>
-        <div class="field">
-          <label>Display Panels</label>
-          <div class="vis-grid">
-            <div class="vis-item"><span class="vis-label">Session Info</span>
-              <label class="switch"><input type="checkbox" id="vis-session" checked onchange="setPanelVis('session',this.checked)"><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Readouts</span>
-              <label class="switch"><input type="checkbox" id="vis-readouts" checked onchange="setPanelVis('readouts',this.checked)"><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Usage Stats</span>
-              <label class="switch"><input type="checkbox" id="vis-stats" checked onchange="setPanelVis('stats',this.checked)"><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">History</span>
-              <label class="switch"><input type="checkbox" id="vis-history" checked onchange="setPanelVis('history',this.checked)"><span class="sw-track"></span></label></div>
+        <details style="border:1px solid var(--border);border-radius:7px;overflow:hidden">
+          <summary style="padding:8px 11px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;justify-content:space-between">
+            Display Panels <span style="font-size:.65rem;transition:transform .2s">&#9662;</span>
+          </summary>
+          <div style="padding:0 11px 10px">
+            <div class="vis-grid" style="margin-top:8px">
+              <div class="vis-item"><span class="vis-label">Session Info</span>
+                <label class="switch"><input type="checkbox" id="vis-session" checked onchange="setPanelVis('session',this.checked)"><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Readouts</span>
+                <label class="switch"><input type="checkbox" id="vis-readouts" checked onchange="setPanelVis('readouts',this.checked)"><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Usage Stats</span>
+                <label class="switch"><input type="checkbox" id="vis-stats" checked onchange="setPanelVis('stats',this.checked)"><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">History</span>
+                <label class="switch"><input type="checkbox" id="vis-history" checked onchange="setPanelVis('history',this.checked)"><span class="sw-track"></span></label></div>
+            </div>
           </div>
-        </div>
-        <div class="field">
-          <label>OLED Display Modes <span style="font-size:.72rem;color:var(--muted)">(Expansion Board)</span></label>
-          <div class="vis-grid">
-            <div class="vis-item"><span class="vis-label">Level Dashboard</span>
-              <label class="switch"><input type="checkbox" id="oled-mode-0" checked><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Session</span>
-              <label class="switch"><input type="checkbox" id="oled-mode-1" checked><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Network</span>
-              <label class="switch"><input type="checkbox" id="oled-mode-2" checked><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Stats</span>
-              <label class="switch"><input type="checkbox" id="oled-mode-3" checked><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Big %</span>
-              <label class="switch"><input type="checkbox" id="oled-mode-4" checked><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Fill Bar</span>
-              <label class="switch"><input type="checkbox" id="oled-mode-5" checked><span class="sw-track"></span></label></div>
-            <div class="vis-item"><span class="vis-label">Raw Ohms</span>
-              <label class="switch"><input type="checkbox" id="oled-mode-6" checked><span class="sw-track"></span></label></div>
+        </details>
+        <details style="border:1px solid var(--border);border-radius:7px;overflow:hidden">
+          <summary style="padding:8px 11px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;justify-content:space-between">
+            OLED Display Modes <span style="font-size:.65rem;transition:transform .2s">&#9662;</span>
+          </summary>
+          <div style="padding:0 11px 10px">
+            <div class="vis-grid" style="margin-top:8px">
+              <div class="vis-item"><span class="vis-label">Level Dashboard</span>
+                <label class="switch"><input type="checkbox" id="oled-mode-0" checked><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Session</span>
+                <label class="switch"><input type="checkbox" id="oled-mode-1" checked><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Network</span>
+                <label class="switch"><input type="checkbox" id="oled-mode-2" checked><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Stats</span>
+                <label class="switch"><input type="checkbox" id="oled-mode-3" checked><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Big %</span>
+                <label class="switch"><input type="checkbox" id="oled-mode-4" checked><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Fill Bar</span>
+                <label class="switch"><input type="checkbox" id="oled-mode-5" checked><span class="sw-track"></span></label></div>
+              <div class="vis-item"><span class="vis-label">Raw Ohms</span>
+                <label class="switch"><input type="checkbox" id="oled-mode-6" checked><span class="sw-track"></span></label></div>
+            </div>
+            <button class="btn btn-sm" style="margin-top:8px" onclick="applyOledModes()">Apply OLED Modes</button>
+            <div style="margin-top:10px">
+              <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Current Display</label>
+              <div style="display:flex;flex-wrap:wrap;gap:6px" id="oled-mode-btns">
+                <button class="oled-mb" id="oled-mb-0" onclick="setOledMode(0)">Dashboard</button>
+                <button class="oled-mb" id="oled-mb-1" onclick="setOledMode(1)">Session</button>
+                <button class="oled-mb" id="oled-mb-2" onclick="setOledMode(2)">Network</button>
+                <button class="oled-mb" id="oled-mb-3" onclick="setOledMode(3)">Stats</button>
+                <button class="oled-mb" id="oled-mb-4" onclick="setOledMode(4)">Big %</button>
+                <button class="oled-mb" id="oled-mb-5" onclick="setOledMode(5)">Fill Bar</button>
+                <button class="oled-mb" id="oled-mb-6" onclick="setOledMode(6)">Raw Ohms</button>
+              </div>
+            </div>
           </div>
-          <button class="btn btn-sm" style="margin-top:8px" onclick="applyOledModes()">Apply OLED Modes</button>
-        </div>
+        </details>
         <button class="btn" onclick="applySettings()">Apply Settings</button>
         <div class="sub-section">
           <div class="sub-section-hdr"><span class="sub-title">&#128246; Network</span></div>
@@ -951,6 +974,12 @@ async function applySettings(){
   if (!sent) setStatus('', 'Settings saved locally — connect to send to device.');
 }
 
+async function setOledMode(n) {
+  const sent = await sendToDevice({type:'set_oled_mode', mode: n});
+  if (!sent) { alert('Not connected. Connect via BLE or DieselTank WiFi, then try again.'); return; }
+  document.querySelectorAll('.oled-mb').forEach((b,i) => b.classList.toggle('active', i === n));
+}
+
 async function applyOledModes(){
   let mask = 0;
   for (let i = 0; i < 7; i++) {
@@ -1256,6 +1285,7 @@ function connectWS(){
         if (d.ap_ssid)   { document.getElementById('net-ssid-display').textContent = d.ap_ssid; document.getElementById('net-ssid-input').value = d.ap_ssid; }
         if (d.ble_pin != null) { document.getElementById('ble-pin-display').textContent = d.ble_pin||'Off'; document.getElementById('ble-pin-input').value = d.ble_pin||''; }
         if (d.oled_modes != null) { for (let i=0;i<7;i++) { const el=document.getElementById('oled-mode-'+i); if(el) el.checked=!!(d.oled_modes&(1<<i)); } }
+        if (d.oled_mode != null) { document.querySelectorAll('.oled-mb').forEach((b,i) => b.classList.toggle('active', i === d.oled_mode)); }
         if (d.timer_sec != null && !bleConnected) renderTimer(d.timer_sec, d.timer_min * 60);
       } else if (d.type === 'history') {
         if (Array.isArray(d.sessions)) { app.history = d.sessions; saveHistory(); renderHistory(); renderStats(); }
@@ -1335,7 +1365,7 @@ function toggleSweep(){
 Object.assign(window, {
   setPanelVis, togglePanel, setMode, setDefaultTimer,
   updateOffsetDisplay, onStdChange, applySettings,
-  toggleNetEdit, toggleBleEdit, applyBlePin, applyOledModes,
+  toggleNetEdit, toggleBleEdit, applyBlePin, applyOledModes, setOledMode,
   togglePassVis, applyNetwork, confirmFactoryReset,
   onSwSessionChange, clearHistory, exportHistory,
   toggleDev, mockSlider, mockPreset, mockLiveToggle,
