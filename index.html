@@ -987,6 +987,26 @@ function togglePassVis(){ const inp=document.getElementById('net-pass-input'); i
 document.addEventListener('DOMContentLoaded', ()=>{
   const passInp=document.getElementById('net-pass-input');
   if(passInp) passInp.addEventListener('input',()=>{ document.getElementById('net-pass-warn').style.display=passInp.value.trim()===''?'block':'none'; });
+
+  // Restore last-known device config so settings survive BLE reconnects
+  // (broadcastConfig() is WebSocket-only; BLE-only users never get a fresh config push)
+  try {
+    const saved = JSON.parse(localStorage.getItem('tank_cfg'));
+    if (saved) {
+      if (saved.std_key)      { app.stdKey = saved.std_key; document.getElementById('std-select').value = saved.std_key; onStdChange(); }
+      if (saved.capacity_gal) { app.capacityG = saved.capacity_gal; document.getElementById('cap-input').value = saved.capacity_gal; }
+      if (saved.price_per_gal){ app.pricePerGal = saved.price_per_gal; document.getElementById('price-input').value = saved.price_per_gal; }
+      if (saved.timer_min)    { app.timerMin = saved.timer_min; document.getElementById('timer-slider').value = saved.timer_min; document.getElementById('timer-val').textContent = saved.timer_min+' min'; }
+      if (saved.cal_offset != null) { app.calOffset = saved.cal_offset; document.getElementById('offset-slider').value = saved.cal_offset; updateOffsetDisplay(saved.cal_offset); }
+      if (saved.std_key === 'CUSTOM' && saved.empty_ohm != null && saved.full_ohm != null) {
+        document.getElementById('cust-empty').value = saved.empty_ohm;
+        document.getElementById('cust-full').value  = saved.full_ohm;
+        STANDARDS.CUSTOM = { emptyOhm: saved.empty_ohm, fullOhm: saved.full_ohm, label: 'Custom' };
+      }
+      if (saved.mode) setMode(saved.mode);
+    }
+  } catch(_) {}
+
   // Android Chrome bonus: silently reconnect to a previously-paired device
   // without showing the picker. No-op on iOS / unsupported browsers.
   tryAutoConnect();
@@ -1240,7 +1260,7 @@ function connectWS(){
         }
       } else if (d.type === 'config') {
         if (d.mode)         setMode(d.mode);
-        if (d.std_key)      { app.stdKey = d.std_key; document.getElementById('std-select').value = d.std_key; }
+        if (d.std_key)      { app.stdKey = d.std_key; document.getElementById('std-select').value = d.std_key; onStdChange(); }
         if (d.capacity_gal) { app.capacityG = d.capacity_gal; document.getElementById('cap-input').value = d.capacity_gal; }
         if (d.price_per_gal){ app.pricePerGal = d.price_per_gal; document.getElementById('price-input').value = d.price_per_gal; }
         if (d.timer_min)    { app.timerMin = d.timer_min; document.getElementById('timer-slider').value = d.timer_min; document.getElementById('timer-val').textContent = d.timer_min+' min'; }
@@ -1258,9 +1278,20 @@ function connectWS(){
         }
         if (d.ap_ssid)   { document.getElementById('net-ssid-display').textContent = d.ap_ssid; document.getElementById('net-ssid-input').value = d.ap_ssid; }
         if (d.ble_pin != null) { document.getElementById('ble-pin-display').textContent = d.ble_pin||'Off'; document.getElementById('ble-pin-input').value = d.ble_pin||''; }
+        if (d.std_key === 'CUSTOM' && d.empty_ohm != null && d.full_ohm != null) {
+          document.getElementById('cust-empty').value = d.empty_ohm;
+          document.getElementById('cust-full').value  = d.full_ohm;
+          STANDARDS.CUSTOM = { emptyOhm: d.empty_ohm, fullOhm: d.full_ohm, label: 'Custom' };
+        }
         if (d.oled_modes != null) { for (let i=0;i<7;i++) { const el=document.getElementById('oled-mode-'+i); if(el) el.checked=!!(d.oled_modes&(1<<i)); } }
         if (d.oled_mode != null) { document.querySelectorAll('.oled-mb').forEach((b,i) => b.classList.toggle('active', i === d.oled_mode)); }
         if (d.timer_sec != null && !bleConnected) renderTimer(d.timer_sec, d.timer_min * 60);
+        // Persist config so BLE-only reconnects restore settings without a new broadcastConfig
+        try { localStorage.setItem('tank_cfg', JSON.stringify({
+          std_key: d.std_key, capacity_gal: d.capacity_gal, price_per_gal: d.price_per_gal,
+          timer_min: d.timer_min, cal_offset: d.cal_offset, empty_ohm: d.empty_ohm, full_ohm: d.full_ohm,
+          mode: d.mode, switch_session: d.switch_session, dispense_trigger_sec: d.dispense_trigger_sec,
+        })); } catch(_) {}
       } else if (d.type === 'history') {
         if (Array.isArray(d.sessions)) { app.history = d.sessions; saveHistory(); renderHistory(); renderStats(); }
       }
