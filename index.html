@@ -949,8 +949,11 @@ async function applySettings(){
   renderStats();
   document.getElementById('settings-panel').classList.remove('open');
   try{localStorage.setItem('dtm_cal_offset',offset);}catch(_){}
+  const custEmpty = key==='CUSTOM' ? parseFloat(document.getElementById('cust-empty').value) : undefined;
+  const custFull  = key==='CUSTOM' ? parseFloat(document.getElementById('cust-full').value)  : undefined;
   const sent = await sendToDevice({type:'config',std_key:key,capacity_gal:cap,price_per_gal:price,
-    timer_min:timer,mode:app.mode,cal_offset:offset,switch_session:swSess,dispense_trigger_sec:dispTrig});
+    timer_min:timer,mode:app.mode,cal_offset:offset,switch_session:swSess,dispense_trigger_sec:dispTrig,
+    ...(key==='CUSTOM' && {custom_empty:custEmpty, custom_full:custFull})});
   if (!sent) setStatus('', 'Settings saved locally — connect to send to device.');
 }
 
