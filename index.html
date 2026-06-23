@@ -754,8 +754,12 @@ function renderBle(gallons, pct) {
   pctEl.classList.toggle('flashing', adjFrac <= 0.15);
   document.getElementById('vol-text').textContent = gallons.toFixed(1);
   document.getElementById('rem-text').textContent = rem.toFixed(1);
-  document.getElementById('ohm-val').textContent = '—';
-  document.getElementById('ohm-range').textContent = '(BLE live data)';
+  // ohm-val is updated directly by the session char handler (has live ohms)
+  // Only reset if we don't have a reading yet
+  if (app.ohms == null) {
+    document.getElementById('ohm-val').textContent = '—';
+    document.getElementById('ohm-range').textContent = '(BLE live data)';
+  }
   document.querySelectorAll('#ref-table tr[data-std]').forEach(r => r.classList.toggle('active', r.dataset.std === app.stdKey));
   document.getElementById('offset-badge').classList.remove('on');
   if (app.sessionActive) {
@@ -1095,6 +1099,7 @@ function onBleDisconnect() {
   bleChars           = {};
   app.bleGallons     = null;
   app.blePct         = null;
+  app.ohms           = null;
   bleSessionStartGal = null;
   setBleBtn('idle');
   setStatus('', 'BLE disconnected.');
@@ -1187,7 +1192,45 @@ async function _bleConnect(device) {
 
   await sessChar.startNotifications();
   sessChar.addEventListener('characteristicvaluechanged', e => {
-    handleBleSession(dec(e.target.value) === '1');
+    const raw = dec(e.target.value);
+
+    // Session closed — firmware sends "END|gal|cost|dur"
+    if (raw.startsWith('END|')) {
+      const [, galStr, costStr, durStr] = raw.split('|');
+      clearInterval(sessionTick);
+      app.sessionActive = false;
+      bleSessionStartGal = null;
+      document.getElementById('session-banner').classList.remove('active');
+      logSession({ ts: Math.floor(Date.now()/1000), gal: parseFloat(galStr), cost: parseFloat(costStr), dur: parseInt(durStr) });
+      return;
+    }
+
+    // History entry from get_history request — "HIST|ts|gal|cost|dur"
+    if (raw.startsWith('HIST|')) {
+      const [, tsStr, galStr, costStr, durStr] = raw.split('|');
+      const entry = { ts: parseInt(tsStr), gal: parseFloat(galStr), cost: parseFloat(costStr), dur: parseInt(durStr) };
+      if (!app.history.find(h => h.ts === entry.ts)) {
+        app.history.push(entry);
+        app.history.sort((a, b) => b.ts - a.ts);
+        if (app.history.length > 50) app.history.pop();
+      }
+      return;
+    }
+    if (raw === 'HIST_DONE') { saveHistory(); renderHistory(); renderStats(); return; }
+
+    // Normal update — "active|ohms" (ohms may be absent on older firmware)
+    const parts = raw.split('|');
+    handleBleSession(parts[0] === '1');
+    if (parts.length > 1) {
+      const ohms = parseFloat(parts[1]);
+      if (!isNaN(ohms) && ohms > 0) {
+        app.ohms = ohms;
+        document.getElementById('ohm-val').textContent = ohms.toFixed(1);
+        const std = STANDARDS[app.stdKey];
+        if (std) document.getElementById('ohm-range').textContent =
+          '(' + std.label + ' · ' + std.emptyOhm + 'Ω E / ' + std.fullOhm + 'Ω F)';
+      }
+    }
   });
 
   // Read initial values so display populates before first notification fires (~500 ms)
@@ -1210,6 +1253,9 @@ async function _bleConnect(device) {
   setBleBtn('connected', devName);
   setStatus('live', 'BLE live — ' + devName);
   setWifiBadge(ws && ws.readyState === 1);
+
+  // Pull history from device — firmware streams HIST| entries then HIST_DONE via session char
+  setTimeout(() => sendViaBle({type:'get_history'}), 800);
 }
 
 // ─────────────────────────────────────────────────────────────
