@@ -458,6 +458,26 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
               <label class="switch"><input type="checkbox" id="vis-history" checked onchange="setPanelVis('history',this.checked)"><span class="sw-track"></span></label></div>
           </div>
         </div>
+        <div class="field">
+          <label>OLED Display Modes <span style="font-size:.72rem;color:var(--muted)">(Expansion Board)</span></label>
+          <div class="vis-grid">
+            <div class="vis-item"><span class="vis-label">Level Dashboard</span>
+              <label class="switch"><input type="checkbox" id="oled-mode-0" checked><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Session</span>
+              <label class="switch"><input type="checkbox" id="oled-mode-1" checked><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Network</span>
+              <label class="switch"><input type="checkbox" id="oled-mode-2" checked><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Stats</span>
+              <label class="switch"><input type="checkbox" id="oled-mode-3" checked><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Big %</span>
+              <label class="switch"><input type="checkbox" id="oled-mode-4" checked><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Fill Bar</span>
+              <label class="switch"><input type="checkbox" id="oled-mode-5" checked><span class="sw-track"></span></label></div>
+            <div class="vis-item"><span class="vis-label">Raw Ohms</span>
+              <label class="switch"><input type="checkbox" id="oled-mode-6" checked><span class="sw-track"></span></label></div>
+          </div>
+          <button class="btn btn-sm" style="margin-top:8px" onclick="applyOledModes()">Apply OLED Modes</button>
+        </div>
         <button class="btn" onclick="applySettings()">Apply Settings</button>
         <div class="sub-section">
           <div class="sub-section-hdr"><span class="sub-title">&#128246; Network</span></div>
@@ -931,6 +951,16 @@ async function applySettings(){
   if (!sent) setStatus('', 'Settings saved locally — connect to send to device.');
 }
 
+async function applyOledModes(){
+  let mask = 0;
+  for (let i = 0; i < 7; i++) {
+    if (document.getElementById('oled-mode-' + i).checked) mask |= (1 << i);
+  }
+  if (mask === 0) { alert('At least one OLED mode must be enabled.'); return; }
+  const sent = await sendToDevice({type:'set_oled_modes', modes: mask});
+  if (!sent) alert('Not connected. Connect via BLE or DieselTank WiFi, then try again.');
+}
+
 function toggleNetEdit(){ const el=document.getElementById('net-edit'); el.style.display=el.style.display==='none'?'':'none'; }
 function toggleBleEdit(){ const el=document.getElementById('ble-edit'); el.style.display=el.style.display==='none'?'':'none'; }
 
@@ -1225,6 +1255,7 @@ function connectWS(){
         }
         if (d.ap_ssid)   { document.getElementById('net-ssid-display').textContent = d.ap_ssid; document.getElementById('net-ssid-input').value = d.ap_ssid; }
         if (d.ble_pin != null) { document.getElementById('ble-pin-display').textContent = d.ble_pin||'Off'; document.getElementById('ble-pin-input').value = d.ble_pin||''; }
+        if (d.oled_modes != null) { for (let i=0;i<7;i++) { const el=document.getElementById('oled-mode-'+i); if(el) el.checked=!!(d.oled_modes&(1<<i)); } }
         if (d.timer_sec != null && !bleConnected) renderTimer(d.timer_sec, d.timer_min * 60);
       } else if (d.type === 'history') {
         if (Array.isArray(d.sessions)) { app.history = d.sessions; saveHistory(); renderHistory(); renderStats(); }
@@ -1304,7 +1335,7 @@ function toggleSweep(){
 Object.assign(window, {
   setPanelVis, togglePanel, setMode, setDefaultTimer,
   updateOffsetDisplay, onStdChange, applySettings,
-  toggleNetEdit, toggleBleEdit, applyBlePin,
+  toggleNetEdit, toggleBleEdit, applyBlePin, applyOledModes,
   togglePassVis, applyNetwork, confirmFactoryReset,
   onSwSessionChange, clearHistory, exportHistory,
   toggleDev, mockSlider, mockPreset, mockLiveToggle,
