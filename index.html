@@ -424,6 +424,10 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
             <option value="FORD">Ford / Motorcraft &#8212; 73 &#937; (E) &middot; 8 &#937; (F)</option>
             <option value="CUSTOM">Custom&#8230;</option>
           </select>
+          <div id="custom-summary" style="display:none;margin-top:5px;font-size:.78rem;color:var(--muted);display:none;align-items:center;gap:8px">
+            <span id="custom-summary-text" style="font-weight:600;color:var(--text)"></span>
+            <button onclick="showCustomEdit()" style="background:none;border:none;color:var(--accent);font-size:.75rem;cursor:pointer;padding:0;text-decoration:underline">Edit</button>
+          </div>
         </div>
         <div id="custom-fields" style="display:none;flex-direction:column;gap:9px">
           <div class="field"><label>Empty (&#937;)</label>
@@ -907,7 +911,25 @@ function updateOffsetDisplay(val){
   if(v===0){el.textContent='No offset';el.className='zero';}
   else{el.textContent=(v>0?'+':'')+v.toFixed(1)+' gal';el.className='';}
 }
-function onStdChange(){ document.getElementById('custom-fields').style.display=document.getElementById('std-select').value==='CUSTOM'?'flex':'none'; }
+function onStdChange(){
+  const isCust = document.getElementById('std-select').value === 'CUSTOM';
+  const hasSaved = STANDARDS.CUSTOM && STANDARDS.CUSTOM.emptyOhm != null;
+  // Show summary if values already exist, otherwise go straight to inputs
+  document.getElementById('custom-summary').style.display = (isCust && hasSaved) ? 'flex' : 'none';
+  document.getElementById('custom-fields').style.display  = (isCust && !hasSaved) ? 'flex' : 'none';
+  if (isCust && hasSaved) updateCustomSummary();
+}
+function updateCustomSummary(){
+  const e = STANDARDS.CUSTOM.emptyOhm, f = STANDARDS.CUSTOM.fullOhm;
+  document.getElementById('custom-summary-text').textContent = e + 'Ω (E) · ' + f + 'Ω (F)';
+  // Also update the dropdown option label so it shows values when collapsed
+  const opt = document.querySelector('#std-select option[value="CUSTOM"]');
+  if (opt) opt.textContent = 'Custom — ' + e + 'Ω (E) · ' + f + 'Ω (F)';
+}
+function showCustomEdit(){
+  document.getElementById('custom-summary').style.display = 'none';
+  document.getElementById('custom-fields').style.display  = 'flex';
+}
 
 // ─────────────────────────────────────────────────────────────
 //  Settings
@@ -942,6 +964,7 @@ async function applySettings(){
     const f=parseFloat(document.getElementById('cust-full').value);
     if(isNaN(e)||isNaN(f)||Math.abs(e-f)<1){alert('Enter distinct Empty/Full values.');return;}
     STANDARDS.CUSTOM={emptyOhm:e,fullOhm:f,label:'Custom'};
+    updateCustomSummary();
   }
   const swSess=document.getElementById('sw-session-chk').checked;
   const dispTrig=parseInt(document.getElementById('disp-trig-slider').value)||30;
@@ -1021,6 +1044,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         document.getElementById('cust-empty').value = saved.empty_ohm;
         document.getElementById('cust-full').value  = saved.full_ohm;
         STANDARDS.CUSTOM = { emptyOhm: saved.empty_ohm, fullOhm: saved.full_ohm, label: 'Custom' };
+        updateCustomSummary();
       }
       if (saved.mode) setMode(saved.mode);
     }
@@ -1343,6 +1367,7 @@ function connectWS(){
           document.getElementById('cust-empty').value = d.empty_ohm;
           document.getElementById('cust-full').value  = d.full_ohm;
           STANDARDS.CUSTOM = { emptyOhm: d.empty_ohm, fullOhm: d.full_ohm, label: 'Custom' };
+          updateCustomSummary();
         }
         if (d.oled_modes != null) { for (let i=0;i<7;i++) { const el=document.getElementById('oled-mode-'+i); if(el) el.checked=!!(d.oled_modes&(1<<i)); } }
         if (d.oled_mode != null) { document.querySelectorAll('.oled-mb').forEach((b,i) => b.classList.toggle('active', i === d.oled_mode)); }
@@ -1430,7 +1455,7 @@ function toggleSweep(){
 // ─────────────────────────────────────────────────────────────
 Object.assign(window, {
   setPanelVis, togglePanel, setMode, setDefaultTimer,
-  updateOffsetDisplay, onStdChange, applySettings,
+  updateOffsetDisplay, onStdChange, showCustomEdit, applySettings,
   toggleNetEdit, toggleBleEdit, applyBlePin, setOledMode,
   togglePassVis, applyNetwork, confirmFactoryReset,
   onSwSessionChange, clearHistory, exportHistory,
