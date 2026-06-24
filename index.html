@@ -430,16 +430,32 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
           </div>
         </div>
         <div id="custom-fields" style="display:none;flex-direction:column;gap:9px">
+          <p style="font-size:.72rem;color:var(--muted);margin:0 0 4px">Fill tank to each level, wait for reading to stabilize, then tap <strong>Capture</strong>. Connect to device first.</p>
           <div class="field"><label>0% — Empty (&#937;)</label>
-            <input type="number" id="cust-empty" min="0" max="9999" step="0.1" value="240"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" id="cust-empty" min="0" max="9999" step="0.1" value="240" style="flex:1">
+              <button onclick="captureOhm('cust-empty')" style="background:var(--accent);color:#000;border:none;border-radius:5px;padding:4px 9px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">Capture</button>
+            </div></div>
           <div class="field"><label>25% (&#937;) <span style="font-size:.7rem;color:var(--muted)">optional</span></label>
-            <input type="number" id="cust-25" min="0" max="9999" step="0.1" placeholder="leave blank for linear"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" id="cust-25" min="0" max="9999" step="0.1" placeholder="linear if blank" style="flex:1">
+              <button onclick="captureOhm('cust-25')" style="background:var(--accent);color:#000;border:none;border-radius:5px;padding:4px 9px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">Capture</button>
+            </div></div>
           <div class="field"><label>50% (&#937;) <span style="font-size:.7rem;color:var(--muted)">optional</span></label>
-            <input type="number" id="cust-50" min="0" max="9999" step="0.1" placeholder="leave blank for linear"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" id="cust-50" min="0" max="9999" step="0.1" placeholder="linear if blank" style="flex:1">
+              <button onclick="captureOhm('cust-50')" style="background:var(--accent);color:#000;border:none;border-radius:5px;padding:4px 9px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">Capture</button>
+            </div></div>
           <div class="field"><label>75% (&#937;) <span style="font-size:.7rem;color:var(--muted)">optional</span></label>
-            <input type="number" id="cust-75" min="0" max="9999" step="0.1" placeholder="leave blank for linear"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" id="cust-75" min="0" max="9999" step="0.1" placeholder="linear if blank" style="flex:1">
+              <button onclick="captureOhm('cust-75')" style="background:var(--accent);color:#000;border:none;border-radius:5px;padding:4px 9px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">Capture</button>
+            </div></div>
           <div class="field"><label>100% — Full (&#937;)</label>
-            <input type="number" id="cust-full" min="0" max="9999" step="0.1" value="33"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" id="cust-full" min="0" max="9999" step="0.1" value="33" style="flex:1">
+              <button onclick="captureOhm('cust-full')" style="background:var(--accent);color:#000;border:none;border-radius:5px;padding:4px 9px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">Capture</button>
+            </div></div>
         </div>
         <details id="ref-details" style="border:1px solid var(--border);border-radius:7px;overflow:hidden">
           <summary style="padding:8px 11px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;justify-content:space-between">
@@ -955,6 +971,13 @@ function updateCustomSummary(){
 function showCustomEdit(){
   document.getElementById('custom-summary').style.display = 'none';
   document.getElementById('custom-fields').style.display  = 'flex';
+}
+function captureOhm(fieldId) {
+  if (app.ohms == null || app.ohms <= 0) {
+    alert('No live reading — connect to the device first and wait for a valid ohms reading.');
+    return;
+  }
+  document.getElementById(fieldId).value = app.ohms.toFixed(1);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1498,7 +1521,7 @@ function toggleSweep(){
 // ─────────────────────────────────────────────────────────────
 Object.assign(window, {
   setPanelVis, togglePanel, setMode, setDefaultTimer,
-  updateOffsetDisplay, onStdChange, showCustomEdit, applySettings,
+  updateOffsetDisplay, onStdChange, showCustomEdit, captureOhm, applySettings,
   toggleNetEdit, toggleBleEdit, applyBlePin, setOledMode,
   togglePassVis, applyNetwork, confirmFactoryReset,
   onSwSessionChange, clearHistory, exportHistory,
