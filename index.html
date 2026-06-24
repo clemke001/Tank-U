@@ -430,9 +430,15 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
           </div>
         </div>
         <div id="custom-fields" style="display:none;flex-direction:column;gap:9px">
-          <div class="field"><label>Empty (&#937;)</label>
+          <div class="field"><label>0% — Empty (&#937;)</label>
             <input type="number" id="cust-empty" min="0" max="9999" step="0.1" value="240"></div>
-          <div class="field"><label>Full (&#937;)</label>
+          <div class="field"><label>25% (&#937;) <span style="font-size:.7rem;color:var(--muted)">optional</span></label>
+            <input type="number" id="cust-25" min="0" max="9999" step="0.1" placeholder="leave blank for linear"></div>
+          <div class="field"><label>50% (&#937;) <span style="font-size:.7rem;color:var(--muted)">optional</span></label>
+            <input type="number" id="cust-50" min="0" max="9999" step="0.1" placeholder="leave blank for linear"></div>
+          <div class="field"><label>75% (&#937;) <span style="font-size:.7rem;color:var(--muted)">optional</span></label>
+            <input type="number" id="cust-75" min="0" max="9999" step="0.1" placeholder="leave blank for linear"></div>
+          <div class="field"><label>100% — Full (&#937;)</label>
             <input type="number" id="cust-full" min="0" max="9999" step="0.1" value="33"></div>
         </div>
         <details id="ref-details" style="border:1px solid var(--border);border-radius:7px;overflow:hidden">
@@ -702,7 +708,24 @@ function loadPanelPrefs(){
 // ─────────────────────────────────────────────────────────────
 //  Render helpers
 // ─────────────────────────────────────────────────────────────
-function ohmsToFraction(ohms,std){ return Math.max(0,Math.min(1,(ohms-std.emptyOhm)/(std.fullOhm-std.emptyOhm))); }
+function ohmsToFraction(ohms, std) {
+  // 5-point interpolation when midpoints are available
+  if (std.cal_25 && std.cal_50 && std.cal_75) {
+    const cal_o = [std.emptyOhm, std.cal_25, std.cal_50, std.cal_75, std.fullOhm];
+    const cal_f = [0, 0.25, 0.50, 0.75, 1.0];
+    if (ohms >= cal_o[0]) return 0;
+    if (ohms <= cal_o[4]) return 1;
+    for (let i = 0; i < 4; i++) {
+      if (ohms <= cal_o[i] && ohms >= cal_o[i+1]) {
+        const seg = (cal_o[i] - ohms) / (cal_o[i] - cal_o[i+1]);
+        return cal_f[i] + seg * (cal_f[i+1] - cal_f[i]);
+      }
+    }
+    return 0;
+  }
+  // Linear 2-point fallback
+  return Math.max(0, Math.min(1, (ohms - std.emptyOhm) / (std.fullOhm - std.emptyOhm)));
+}
 function applyOffset(rawGal){ return Math.max(0, Math.min(app.capacityG, rawGal + app.calOffset)); }
 function levelColor(f){ if(f<=.15)return'#f85149'; if(f<=.30)return'#d29922'; return'#3fb950'; }
 
@@ -920,11 +943,14 @@ function onStdChange(){
   if (isCust && hasSaved) updateCustomSummary();
 }
 function updateCustomSummary(){
-  const e = STANDARDS.CUSTOM.emptyOhm, f = STANDARDS.CUSTOM.fullOhm;
-  document.getElementById('custom-summary-text').textContent = e + 'Ω (E) · ' + f + 'Ω (F)';
-  // Also update the dropdown option label so it shows values when collapsed
+  const c = STANDARDS.CUSTOM;
+  const has5pt = c.cal_25 && c.cal_50 && c.cal_75;
+  const summary = has5pt
+    ? c.emptyOhm + 'Ω (E) · ' + c.cal_25 + ' · ' + c.cal_50 + ' · ' + c.cal_75 + ' · ' + c.fullOhm + 'Ω (F)'
+    : c.emptyOhm + 'Ω (E) · ' + c.fullOhm + 'Ω (F)';
+  document.getElementById('custom-summary-text').textContent = summary;
   const opt = document.querySelector('#std-select option[value="CUSTOM"]');
-  if (opt) opt.textContent = 'Custom — ' + e + 'Ω (E) · ' + f + 'Ω (F)';
+  if (opt) opt.textContent = has5pt ? 'Custom (5-pt calibration)' : 'Custom — ' + c.emptyOhm + 'Ω (E) · ' + c.fullOhm + 'Ω (F)';
 }
 function showCustomEdit(){
   document.getElementById('custom-summary').style.display = 'none';
@@ -960,10 +986,13 @@ async function applySettings(){
   const timer=parseInt(document.getElementById('timer-slider').value)||5;
   const offset=parseFloat(document.getElementById('offset-slider').value)||0;
   if(key==='CUSTOM'){
-    const e=parseFloat(document.getElementById('cust-empty').value);
-    const f=parseFloat(document.getElementById('cust-full').value);
+    const e  = parseFloat(document.getElementById('cust-empty').value);
+    const f  = parseFloat(document.getElementById('cust-full').value);
+    const c25 = parseFloat(document.getElementById('cust-25').value) || 0;
+    const c50 = parseFloat(document.getElementById('cust-50').value) || 0;
+    const c75 = parseFloat(document.getElementById('cust-75').value) || 0;
     if(isNaN(e)||isNaN(f)||Math.abs(e-f)<1){alert('Enter distinct Empty/Full values.');return;}
-    STANDARDS.CUSTOM={emptyOhm:e,fullOhm:f,label:'Custom'};
+    STANDARDS.CUSTOM={emptyOhm:e,fullOhm:f,cal_25:c25,cal_50:c50,cal_75:c75,label:'Custom'};
     updateCustomSummary();
   }
   const swSess=document.getElementById('sw-session-chk').checked;
@@ -987,15 +1016,21 @@ async function applySettings(){
     if (key === 'CUSTOM' && STANDARDS.CUSTOM) {
       cfg.empty_ohm = STANDARDS.CUSTOM.emptyOhm;
       cfg.full_ohm  = STANDARDS.CUSTOM.fullOhm;
+      cfg.cal_25    = STANDARDS.CUSTOM.cal_25 || 0;
+      cfg.cal_50    = STANDARDS.CUSTOM.cal_50 || 0;
+      cfg.cal_75    = STANDARDS.CUSTOM.cal_75 || 0;
     }
     localStorage.setItem('tank_cfg', JSON.stringify(cfg));
     localStorage.setItem('dtm_cal_offset', offset);
   } catch(_) {}
   const custEmpty = key==='CUSTOM' ? parseFloat(document.getElementById('cust-empty').value) : undefined;
   const custFull  = key==='CUSTOM' ? parseFloat(document.getElementById('cust-full').value)  : undefined;
+  const cust25    = key==='CUSTOM' ? (parseFloat(document.getElementById('cust-25').value)||0) : undefined;
+  const cust50    = key==='CUSTOM' ? (parseFloat(document.getElementById('cust-50').value)||0) : undefined;
+  const cust75    = key==='CUSTOM' ? (parseFloat(document.getElementById('cust-75').value)||0) : undefined;
   const sent = await sendToDevice({type:'config',std_key:key,capacity_gal:cap,price_per_gal:price,
     timer_min:timer,mode:app.mode,cal_offset:offset,switch_session:swSess,dispense_trigger_sec:dispTrig,
-    ...(key==='CUSTOM' && {custom_empty:custEmpty, custom_full:custFull})});
+    ...(key==='CUSTOM' && {custom_empty:custEmpty, custom_full:custFull, cal_25:cust25, cal_50:cust50, cal_75:cust75})});
   if (!sent) setStatus('', 'Settings saved locally — connect to send to device.');
 }
 
@@ -1043,7 +1078,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if (saved.std_key === 'CUSTOM' && saved.empty_ohm != null && saved.full_ohm != null) {
         document.getElementById('cust-empty').value = saved.empty_ohm;
         document.getElementById('cust-full').value  = saved.full_ohm;
-        STANDARDS.CUSTOM = { emptyOhm: saved.empty_ohm, fullOhm: saved.full_ohm, label: 'Custom' };
+        if (saved.cal_25) document.getElementById('cust-25').value = saved.cal_25;
+        if (saved.cal_50) document.getElementById('cust-50').value = saved.cal_50;
+        if (saved.cal_75) document.getElementById('cust-75').value = saved.cal_75;
+        STANDARDS.CUSTOM = { emptyOhm: saved.empty_ohm, fullOhm: saved.full_ohm,
+          cal_25: saved.cal_25||0, cal_50: saved.cal_50||0, cal_75: saved.cal_75||0, label: 'Custom' };
         updateCustomSummary();
       }
       if (saved.mode) setMode(saved.mode);
@@ -1366,7 +1405,11 @@ function connectWS(){
         if (d.std_key === 'CUSTOM' && d.empty_ohm != null && d.full_ohm != null) {
           document.getElementById('cust-empty').value = d.empty_ohm;
           document.getElementById('cust-full').value  = d.full_ohm;
-          STANDARDS.CUSTOM = { emptyOhm: d.empty_ohm, fullOhm: d.full_ohm, label: 'Custom' };
+          if (d.cal_25) document.getElementById('cust-25').value = d.cal_25;
+          if (d.cal_50) document.getElementById('cust-50').value = d.cal_50;
+          if (d.cal_75) document.getElementById('cust-75').value = d.cal_75;
+          STANDARDS.CUSTOM = { emptyOhm: d.empty_ohm, fullOhm: d.full_ohm,
+            cal_25: d.cal_25||0, cal_50: d.cal_50||0, cal_75: d.cal_75||0, label: 'Custom' };
           updateCustomSummary();
         }
         if (d.oled_modes != null) { for (let i=0;i<7;i++) { const el=document.getElementById('oled-mode-'+i); if(el) el.checked=!!(d.oled_modes&(1<<i)); } }
