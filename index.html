@@ -115,6 +115,31 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; gap:
 #gauge-center .label { font-size: .65rem; color: var(--muted); letter-spacing: .09em; text-transform: uppercase; margin-top: 2px; }
 #offset-badge { display: none; position: absolute; top: 8px; right: 8px; font-size: .62rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; color: var(--muted); }
 #offset-badge.on { display: block; }
+/* ── Display mode toggle ── */
+#disp-toggle { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
+.dtm-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted); border-radius:16px; padding:5px 14px; font-size:.72rem; font-weight:600; cursor:pointer; transition:all .15s; }
+.dtm-btn.active { background:var(--accent); color:#000; border-color:var(--accent); }
+.dtm-btn:hover:not(.active) { color:var(--text); border-color:var(--muted); }
+/* ── Bar display ── */
+#bar-wrap { width:min(var(--gauge-max),92vw); }
+#bar-track { position:relative; width:100%; height:min(52vw,230px); background:var(--gauge-bg); border-radius:14px; overflow:hidden; }
+#bar-fill { position:absolute; bottom:0; left:0; width:100%; height:0%; transition:height .8s cubic-bezier(.4,0,.2,1),background .4s; }
+#bar-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; }
+#bar-pct { font-size:min(14vw,5rem); font-weight:700; line-height:1; color:var(--muted); }
+#bar-gal-label { font-size:.9rem; color:var(--muted); }
+.bar-ef { display:flex; justify-content:space-between; padding:3px 8px 0; font-size:.65rem; font-weight:700; color:var(--muted); letter-spacing:.06em; }
+/* ── Pct-only display ── */
+#pct-wrap { text-align:center; padding:10px 0 4px; }
+#big-pct { font-size:min(40vw,10rem); font-weight:700; line-height:1; color:var(--muted); }
+#big-sub { font-size:1.1rem; color:var(--muted); margin-top:10px; }
+/* ── Needle gauge ── */
+#needle-wrap { position:relative; width:min(var(--gauge-max),92vw); transition:width .45s cubic-bezier(.4,0,.2,1); }
+#needle-wrap svg { width:100%; height:auto; display:block; overflow:visible; }
+#needle-center { position:absolute; bottom:13%; left:50%; transform:translateX(-50%); text-align:center; pointer-events:none; }
+#needle-arc-bg { fill:none; stroke:var(--gauge-bg); stroke-linecap:round; stroke-width:13; }
+#needle-zone-lo   { fill:none; stroke:#f85149; stroke-linecap:round; stroke-width:13; }
+#needle-zone-warn { fill:none; stroke:#d29922; stroke-linecap:round; stroke-width:13; }
+#needle-zone-ok   { fill:none; stroke:#3d444d; stroke-linecap:round; stroke-width:13; }
 #session-banner { display: none; width: 100%; max-width: 480px; background: var(--surface2); border: 1px solid var(--info); border-radius: 10px; padding: 9px 13px; }
 #session-banner.active { display: block; }
 .session-header { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
@@ -299,6 +324,54 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
     </div>
     <div id="offset-badge">&#177;0 gal</div>
   </div>
+
+  <!-- Bar display -->
+  <div id="bar-wrap" style="display:none">
+    <div id="bar-track">
+      <div id="bar-fill"></div>
+      <div id="bar-center">
+        <div id="bar-pct">&#8212;</div>
+        <div id="bar-gal-label">&#8212; gal</div>
+      </div>
+    </div>
+    <div class="bar-ef"><span>E</span><span>F</span></div>
+  </div>
+
+  <!-- Pct-only display -->
+  <div id="pct-wrap" style="display:none">
+    <div id="big-pct">&#8212;</div>
+    <div id="big-sub">&#8212; gal in tank</div>
+  </div>
+
+  <!-- Needle gauge -->
+  <div id="needle-wrap" style="display:none">
+    <svg viewBox="0 0 220 120" xmlns="http://www.w3.org/2000/svg">
+      <text x="14"  y="90" font-size="11" fill="#8b949e" font-family="sans-serif" font-weight="bold">E</text>
+      <text x="200" y="90" font-size="11" fill="#8b949e" font-family="sans-serif" font-weight="bold">F</text>
+      <path id="needle-arc-bg"/>
+      <path id="needle-zone-lo"/>
+      <path id="needle-zone-warn"/>
+      <path id="needle-zone-ok"/>
+      <g id="needle-ticks"></g>
+      <g id="needle-group">
+        <polygon points="110,40 107.5,112 110,118 112.5,112" fill="#e6edf3"/>
+      </g>
+      <circle cx="110" cy="115" r="5.5" fill="#21262d" stroke="#6e7681" stroke-width="1.5"/>
+    </svg>
+    <div id="needle-center">
+      <div class="big" id="needle-pct-text" style="color:var(--muted)">&#8212;</div>
+      <div class="label">Tank Level</div>
+    </div>
+  </div>
+
+  <!-- Display mode toggle -->
+  <div id="disp-toggle">
+    <button class="dtm-btn active" data-mode="arc"    onclick="setDispMode('arc')">Arc</button>
+    <button class="dtm-btn"        data-mode="needle" onclick="setDispMode('needle')">Needle</button>
+    <button class="dtm-btn"        data-mode="bar"    onclick="setDispMode('bar')">Bar</button>
+    <button class="dtm-btn"        data-mode="pct"    onclick="setDispMode('pct')">% Only</button>
+  </div>
+
   <div id="session-banner">
     <div class="session-header">
       <div class="session-dot"></div>
@@ -634,7 +707,7 @@ const STANDARDS = {
 //  App state
 // ─────────────────────────────────────────────────────────────
 let app = {
-  mode: 1, stdKey: 'SAE', capacityG: 100, pricePerGal: 3.85,
+  mode: 1, stdKey: 'SAE', capacityG: 100, pricePerGal: 3.85, dispMode: 'arc',
   timerMin: 5, defaultTimer: 5, calOffset: 0,
   switchSession: true, dispenseTriggerSec: 30,
   ohms: null,
@@ -701,6 +774,78 @@ function updateGaugeSize(){
   const sizes=[520,440,380,340,300];
   const max=sizes[Math.min(vis,sizes.length-1)];
   document.documentElement.style.setProperty('--gauge-max', max+'px');
+}
+
+function initNeedleGauge(){
+  // Full arc background
+  const[ex,ey]=svgPt(CX,CY,R,E_ANG),[fx,fy]=svgPt(CX,CY,R,F_ANG);
+  const fullArc='M '+ex.toFixed(2)+' '+ey.toFixed(2)+' A '+R+' '+R+' 0 0 1 '+fx.toFixed(2)+' '+fy.toFixed(2);
+  document.getElementById('needle-arc-bg').setAttribute('d', fullArc);
+  // Colored zone arcs
+  function zoneArc(f0,f1){
+    const s=E_ANG+f0*SWEEP_DEG, e=E_ANG+f1*SWEEP_DEG;
+    const[sx,sy]=svgPt(CX,CY,R,s),[zx,zy]=svgPt(CX,CY,R,e);
+    return 'M '+sx.toFixed(2)+' '+sy.toFixed(2)+' A '+R+' '+R+' 0 0 1 '+zx.toFixed(2)+' '+zy.toFixed(2);
+  }
+  document.getElementById('needle-zone-lo').setAttribute('d',   zoneArc(0,    0.15));
+  document.getElementById('needle-zone-warn').setAttribute('d', zoneArc(0.15, 0.30));
+  document.getElementById('needle-zone-ok').setAttribute('d',   zoneArc(0.30, 1.0 ));
+  // Tick marks
+  const tickG=document.getElementById('needle-ticks');
+  [0,.25,.5,.75,1].forEach((f,i)=>{
+    const ang=E_ANG+f*SWEEP_DEG;
+    const[ix,iy]=svgPt(CX,CY,R+8,ang),[ox,oy]=svgPt(CX,CY,R+17,ang);
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',ix.toFixed(1));line.setAttribute('y1',iy.toFixed(1));
+    line.setAttribute('x2',ox.toFixed(1));line.setAttribute('y2',oy.toFixed(1));
+    line.setAttribute('stroke',i%2===0?'#8b949e':'#3d444d');
+    line.setAttribute('stroke-width',i%2===0?'1.5':'1');
+    tickG.appendChild(line);
+    if(f===.25||f===.5||f===.75){
+      const[lx,ly]=svgPt(CX,CY,R+27,ang);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',lx.toFixed(1));t.setAttribute('y',(ly+3).toFixed(1));
+      t.setAttribute('font-size','8');t.setAttribute('fill','#3d444d');
+      t.setAttribute('text-anchor','middle');t.setAttribute('font-family','sans-serif');
+      t.textContent=f===.25?'¼':f===.5?'½':'¾';
+      tickG.appendChild(t);
+    }
+  });
+  // Park needle at E
+  document.getElementById('needle-group').setAttribute('transform',`rotate(-70,${CX},${CY})`);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Display mode
+// ─────────────────────────────────────────────────────────────
+function setDispMode(mode){
+  app.dispMode=mode;
+  const map={arc:'gauge-wrap',needle:'needle-wrap',bar:'bar-wrap',pct:'pct-wrap'};
+  Object.entries(map).forEach(([m,id])=>{ document.getElementById(id).style.display=m===mode?'':'none'; });
+  document.querySelectorAll('.dtm-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  try{localStorage.setItem('dtm_disp_mode',mode);}catch(_){}
+  updateGaugeSize();
+}
+
+function updateAltDisplays(pct,gallons,col){
+  const has=pct!=null;
+  const pctStr=has?pct+'%':'—';
+  const color=has?col:'var(--muted)';
+  // Bar
+  document.getElementById('bar-fill').style.height=has?pct+'%':'0%';
+  document.getElementById('bar-fill').style.background=color;
+  const bpEl=document.getElementById('bar-pct');
+  bpEl.textContent=pctStr;bpEl.style.color=color;
+  document.getElementById('bar-gal-label').textContent=has?gallons.toFixed(1)+' gal':'— gal';
+  // Pct-only
+  const bgEl=document.getElementById('big-pct');
+  bgEl.textContent=pctStr;bgEl.style.color=color;
+  document.getElementById('big-sub').textContent=has?gallons.toFixed(1)+' gal in tank':'— gal in tank';
+  // Needle
+  const npEl=document.getElementById('needle-pct-text');
+  npEl.textContent=pctStr;npEl.style.color=color;
+  const rotDeg=has?(pct/100)*SWEEP_DEG-70:-70;
+  document.getElementById('needle-group').setAttribute('transform',`rotate(${rotDeg.toFixed(1)},${CX},${CY})`);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -784,6 +929,7 @@ function render(ohms){
     document.getElementById('sess-gal').textContent=app.sessionGal.toFixed(1);
     document.getElementById('sess-cost').textContent=(app.sessionGal*app.pricePerGal).toFixed(2);
   }
+  updateAltDisplays(ohms!=null?pct:null, ohms!=null?adjGal:null, col);
 }
 
 function renderBle(gallons, pct) {
@@ -811,6 +957,7 @@ function renderBle(gallons, pct) {
     document.getElementById('sess-gal').textContent = app.sessionGal.toFixed(1);
     document.getElementById('sess-cost').textContent = (app.sessionGal * app.pricePerGal).toFixed(2);
   }
+  updateAltDisplays(pct, gallons, col);
 }
 
 function tryRenderBle() {
@@ -1119,6 +1266,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if (saved.mode) setMode(saved.mode);
     }
   } catch(_) {}
+
+  // Restore display mode preference
+  try { const dm=localStorage.getItem('dtm_disp_mode'); if(dm) setDispMode(dm); } catch(_) {}
 
   // Android Chrome bonus: silently reconnect to a previously-paired device
   // without showing the picker. No-op on iOS / unsupported browsers.
@@ -1529,7 +1679,7 @@ function toggleSweep(){
 // ─────────────────────────────────────────────────────────────
 Object.assign(window, {
   setPanelVis, togglePanel, setMode, setDefaultTimer,
-  updateOffsetDisplay, stepOffset, onStdChange, showCustomEdit, captureOhm, applySettings,
+  updateOffsetDisplay, stepOffset, setDispMode, onStdChange, showCustomEdit, captureOhm, applySettings,
   toggleNetEdit, toggleBleEdit, applyBlePin, setOledMode,
   togglePassVis, applyNetwork, confirmFactoryReset,
   onSwSessionChange, clearHistory, exportHistory,
@@ -1545,6 +1695,7 @@ document.getElementById('ref-details').addEventListener('toggle', function(){
 });
 
 initGauge();
+initNeedleGauge();
 loadHistory();
 loadPanelPrefs();
 renderHistory();

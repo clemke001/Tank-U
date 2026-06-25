@@ -1,6 +1,6 @@
 // Tank-U PWA — Service Worker
 // Caches the app shell for offline access.
-const CACHE = 'tank-u-v10';
+const CACHE = 'tank-u-v11';
 const SHELL = ['./index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
