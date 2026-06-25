@@ -1017,6 +1017,7 @@ async function applySettings(){
     if(isNaN(e)||isNaN(f)||Math.abs(e-f)<1){alert('Enter distinct Empty/Full values.');return;}
     STANDARDS.CUSTOM={emptyOhm:e,fullOhm:f,cal_25:c25,cal_50:c50,cal_75:c75,label:'Custom'};
     updateCustomSummary();
+    onStdChange();
   }
   const swSess=document.getElementById('sw-session-chk').checked;
   const dispTrig=parseInt(document.getElementById('disp-trig-slider').value)||30;
