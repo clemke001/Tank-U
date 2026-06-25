@@ -382,9 +382,11 @@ select:focus, input:focus { outline: 1px solid var(--accent); }
         <div class="field">
           <label>Sender Calibration Offset</label>
           <div class="offset-row">
-            <input type="range" id="offset-slider" min="-50" max="50" step="0.5" value="0"
-              oninput="updateOffsetDisplay(this.value)">
-            <span id="offset-display" class="zero">No offset</span>
+            <button onclick="stepOffset(-0.5)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;width:28px;height:28px;font-size:1rem;cursor:pointer;flex-shrink:0;line-height:1">−</button>
+            <input type="range" id="offset-slider" min="-50" max="50" step="0.5" value="0" autocomplete="off"
+              oninput="updateOffsetDisplay(this.value)" style="flex:1;min-width:0">
+            <button onclick="stepOffset(0.5)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;width:28px;height:28px;font-size:1rem;cursor:pointer;flex-shrink:0;line-height:1">+</button>
+            <span id="offset-display" class="zero" style="min-width:52px;text-align:right">No offset</span>
           </div>
           <div class="field-desc">Adjust if your sender reads slightly high or low. Applied after standard conversion.</div>
         </div>
@@ -949,6 +951,11 @@ function updateOffsetDisplay(val){
   const el=document.getElementById('offset-display');
   if(v===0){el.textContent='No offset';el.className='zero';}
   else{el.textContent=(v>0?'+':'')+v.toFixed(1)+' gal';el.className='';}
+}
+function stepOffset(delta){
+  const sl=document.getElementById('offset-slider');
+  const v=Math.min(50,Math.max(-50,parseFloat(sl.value)+delta));
+  sl.value=v; updateOffsetDisplay(v);
 }
 function onStdChange(){
   const isCust = document.getElementById('std-select').value === 'CUSTOM';
@@ -1522,7 +1529,7 @@ function toggleSweep(){
 // ─────────────────────────────────────────────────────────────
 Object.assign(window, {
   setPanelVis, togglePanel, setMode, setDefaultTimer,
-  updateOffsetDisplay, onStdChange, showCustomEdit, captureOhm, applySettings,
+  updateOffsetDisplay, stepOffset, onStdChange, showCustomEdit, captureOhm, applySettings,
   toggleNetEdit, toggleBleEdit, applyBlePin, setOledMode,
   togglePassVis, applyNetwork, confirmFactoryReset,
   onSwSessionChange, clearHistory, exportHistory,
@@ -1548,7 +1555,7 @@ updateGaugeSize();
 setBleBtn('idle');
 setWifiBadge(false);
 
-try { const co=parseFloat(localStorage.getItem('dtm_cal_offset'));if(!isNaN(co)&&co!==0){app.calOffset=co;document.getElementById('offset-slider').value=co;updateOffsetDisplay(co);} }catch(_){}
+// cal_offset restored via tank_cfg in DOMContentLoaded — no separate key needed
 try { const dt=parseInt(localStorage.getItem('dtm_default_timer'));if(dt>=1&&dt<=30){app.defaultTimer=dt;app.timerMin=dt;document.getElementById('timer-slider').value=dt;document.getElementById('timer-val').textContent=dt+' min';} }catch(_){}
 
 connectWS();
